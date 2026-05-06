@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
+import seatSoloLogo from "@/assets/seatsolo-mark.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -94,8 +95,8 @@ function Index() {
     <AppShell>
       <div className="flex flex-col gap-10 pt-8">
         <header className="flex flex-col gap-3">
-          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
-            <span className="h-2 w-2 rounded-full bg-primary" /> Seat Solo
+          <div className="inline-flex w-fit items-center gap-2">
+            <img src={seatSoloLogo} alt="Seat Solo" className="h-10 w-auto" />
           </div>
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-foreground">
             Dine together,
