@@ -63,12 +63,14 @@ Deno.serve(async (req) => {
 Return JSON exactly in this shape:
 {
   "restaurant": string | null,
-  "items": [{ "name": string, "price": number }],
+  "items": [{ "name": string, "quantity": number, "unit_price": number }],
   "tax": number | null,
   "total": number | null
 }
 - Use the merchant/restaurant name from the top of the receipt.
-- Each item is a single ordered line item with its price (post-discount, pre-tax if shown that way). Skip subtotal/tax/tip/total lines.
+- Each item is one ordered line item. "quantity" is how many were ordered (e.g. "3 Chocolate Cake" => quantity 3). Default to 1 if not shown.
+- "unit_price" is the price for ONE of that item (post-discount, pre-tax if shown that way). If the receipt only shows a line total, divide by quantity.
+- Skip subtotal/tax/tip/total lines.
 - Prices must be numbers (no currency symbols).
 - If a value is unknown, use null.`,
                 },
@@ -108,12 +110,19 @@ Return JSON exactly in this shape:
     }
 
     const items = Array.isArray(parsed.items)
-      ? parsed.items
-          .map((i: any) => ({
-            name: String(i?.name ?? "").trim() || "Item",
-            price: typeof i?.price === "number" ? i.price : Number(i?.price) || 0,
-          }))
-          .filter((i: any) => i.price > 0)
+      ? parsed.items.flatMap((i: any) => {
+          const name = String(i?.name ?? "").trim() || "Item";
+          const rawQty = Number(i?.quantity);
+          const qty = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
+          let unit = typeof i?.unit_price === "number" ? i.unit_price : Number(i?.unit_price);
+          if (!Number.isFinite(unit) || unit <= 0) {
+            // Fallback: legacy "price" field treated as line total
+            const legacy = typeof i?.price === "number" ? i.price : Number(i?.price);
+            if (Number.isFinite(legacy) && legacy > 0) unit = legacy / qty;
+          }
+          if (!Number.isFinite(unit) || unit <= 0) return [];
+          return Array.from({ length: qty }, () => ({ name, price: Number(unit.toFixed(2)) }));
+        })
       : [];
 
     const num = (v: any) => (typeof v === "number" ? v : v == null ? null : Number(v) || null);
