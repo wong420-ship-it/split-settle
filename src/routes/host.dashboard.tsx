@@ -365,6 +365,43 @@ function HostDashboard() {
   const total = subtotal + tax + tipAmount;
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${session.share_code}`;
 
+  // Host's own share, computed the same way as guests.
+  const hostItems = hostGuestId
+    ? items
+        .filter((i) => (claimsByItem.get(i.id) ?? []).includes(hostGuestId))
+        .map((i) => {
+          const n = (claimsByItem.get(i.id) ?? []).length || 1;
+          return { ...i, share: Number(i.price) / n, splitN: n };
+        })
+    : [];
+  const hostSubtotal = hostItems.reduce((s, i) => s + i.share, 0);
+  const hostShareRatio = subtotal > 0 ? hostSubtotal / subtotal : 0;
+  const hostTax = tax * hostShareRatio;
+  const hostTip = tipAmount * hostShareRatio;
+  const hostTotal = hostSubtotal + hostTax + hostTip;
+  const hostGuest = guests.find((g) => g.id === hostGuestId) ?? null;
+  const hostPaidAt = hostGuest?.paid_at ?? null;
+
+  const toggleHostPaid = async () => {
+    if (!hostGuestId) return;
+    const next = hostPaidAt ? null : new Date().toISOString();
+    setGuests((prev) =>
+      prev.map((g) => (g.id === hostGuestId ? { ...g, paid_at: next } : g)),
+    );
+    const { error } = await supabase
+      .from("session_users")
+      .update({ paid_at: next })
+      .eq("id", hostGuestId);
+    if (error) {
+      toast.error(`Couldn't update: ${error.message}`);
+      setGuests((prev) =>
+        prev.map((g) => (g.id === hostGuestId ? { ...g, paid_at: hostPaidAt } : g)),
+      );
+      return;
+    }
+    toast.success(next ? "Marked as paid" : "Marked unpaid");
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col gap-6 pb-12">
@@ -595,6 +632,47 @@ function HostDashboard() {
             <span>Total</span><span className="font-mono">${total.toFixed(2)}</span>
           </div>
         </section>
+
+        {hostGuestId && (
+          <section
+            className={`flex flex-col gap-3 rounded-2xl p-5 ${
+              hostPaidAt
+                ? "bg-secondary text-secondary-foreground"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            <div>
+              <div className="text-xs uppercase tracking-wider opacity-80">
+                {hostPaidAt ? "You paid" : "Your share"}
+              </div>
+              <div className="font-mono text-4xl font-bold">${hostTotal.toFixed(2)}</div>
+              <div className="mt-1 text-xs opacity-80">
+                {hostItems.length === 0
+                  ? "Claim items above to add to your share"
+                  : `${hostItems.length} item${hostItems.length === 1 ? "" : "s"} · ${(hostShareRatio * 100).toFixed(0)}% of bill`}
+              </div>
+              {hostPaidAt && (
+                <div className="mt-1 text-xs opacity-80">
+                  Marked paid {new Date(hostPaidAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </div>
+              )}
+            </div>
+            <Button
+              variant={hostPaidAt ? "outline" : "secondary"}
+              size="lg"
+              className="h-11"
+              onClick={toggleHostPaid}
+            >
+              {hostPaidAt ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" /> Paid — tap to undo
+                </>
+              ) : (
+                "Mark as paid"
+              )}
+            </Button>
+          </section>
+        )}
 
         <section className="flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-accent p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-accent-foreground">Share with your table</div>
