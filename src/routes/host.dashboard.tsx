@@ -46,6 +46,13 @@ function HostDashboard() {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [adding, setAdding] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
+  const [reviewTax, setReviewTax] = useState<number | null>(null);
+  const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
+  const [savingReview, setSavingReview] = useState(false);
+  const fileInputRef = useState<HTMLInputElement | null>(null);
 
   // Load session + verify auth
   useEffect(() => {
