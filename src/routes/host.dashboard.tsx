@@ -597,18 +597,37 @@ function HostDashboard() {
           {pendingPreview ? (
             <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-secondary/40 p-3">
               <div className="flex gap-3">
-                <img
-                  src={pendingPreview}
-                  alt="Receipt preview"
-                  className="h-24 w-24 shrink-0 rounded-md border border-border object-cover"
-                />
-                <div className="flex min-w-0 flex-1 flex-col justify-between">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {pendingFile?.name || "Receipt"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {ocrLoading ? "Reading receipt…" : "Processing…"}
-                  </p>
+                <div className="relative h-24 w-24 shrink-0">
+                  <img
+                    src={pendingPreview}
+                    alt="Receipt preview"
+                    className={`h-24 w-24 rounded-md border border-border object-cover transition ${
+                      ocrLoading ? "brightness-50" : ""
+                    }`}
+                  />
+                  {ocrLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="h-7 w-7 animate-spin text-white drop-shadow" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {pendingFile?.name || "Receipt"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {ocrLoading ? "Reading receipt…" : "Processing…"}
+                    </p>
+                  </div>
+                  {ocrLoading && (
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full w-1/3 rounded-full bg-primary"
+                        style={{ animation: "ocr-progress 1.4s ease-in-out infinite" }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               {!ocrLoading && (
