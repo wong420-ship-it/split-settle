@@ -444,7 +444,7 @@ function HostDashboard() {
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-foreground">{item.name}</span>
                       {splitN === 0 ? (
-                        <span className="text-xs text-muted-foreground">Unclaimed</span>
+                        <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-primary">
                           {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
