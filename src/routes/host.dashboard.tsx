@@ -305,12 +305,36 @@ function HostDashboard() {
             </p>
           ) : (
             <ul className="divide-y divide-border">
-              {items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="text-foreground">{item.name}</span>
-                  <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
-                </li>
-              ))}
+              {items.map((item) => {
+                const claimers = claimsByItem.get(item.id) ?? [];
+                const splitN = claimers.length;
+                return (
+                  <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-foreground">{item.name}</span>
+                      {splitN === 0 ? (
+                        <span className="text-xs text-muted-foreground">Unclaimed</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-primary">
+                          {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                          <span className="truncate">
+                            {claimers.map(guestName).join(", ")}
+                            {splitN > 1 && ` · split ${splitN} ways`}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end shrink-0">
+                      <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
+                      {splitN > 1 && (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          ${(Number(item.price) / splitN).toFixed(2)} ea
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <form onSubmit={addItem} className="mt-3 flex gap-2 border-t border-border pt-3">
