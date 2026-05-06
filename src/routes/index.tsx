@@ -10,7 +10,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Seat Solo — Split the bill, item by item" },
+      { title: "Seat Solo — Dine together, Pay Alone" },
       {
         name: "description",
         content:
@@ -98,9 +98,9 @@ function Index() {
             <span className="h-2 w-2 rounded-full bg-primary" /> Seat Solo
           </div>
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-foreground">
-            Split the bill,
+            Dine together,
             <br />
-            <span className="text-primary">item by item.</span>
+            <span className="text-primary">Pay Alone.</span>
           </h1>
           <p className="text-base text-muted-foreground">
             Snap the receipt. Share a code. Everyone taps what they had. No math.
