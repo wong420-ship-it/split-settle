@@ -108,16 +108,22 @@ function HostDashboard() {
       let hostId = typeof window !== "undefined" ? localStorage.getItem(hostKey) : null;
       const existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
       if (!existingHost) {
-        const { data: inserted } = await supabase
-          .from("session_users")
-          .insert({ session_id: s.id, display_name: `${hostName} (host)` })
-          .select("id, display_name, paid_at")
-          .maybeSingle();
-        if (inserted) {
-          hostId = inserted.id;
-          if (typeof window !== "undefined") localStorage.setItem(hostKey, inserted.id);
-          guestList = [...guestList, inserted as Guest];
+        if (!hostInsertRef.current) {
+          hostInsertRef.current = (async () => {
+            const { data: inserted } = await supabase
+              .from("session_users")
+              .insert({ session_id: s.id, display_name: `${hostName} (host)` })
+              .select("id, display_name, paid_at")
+              .maybeSingle();
+            if (inserted) {
+              if (typeof window !== "undefined") localStorage.setItem(hostKey, inserted.id);
+              guestList = [...guestList, inserted as Guest];
+              return inserted.id;
+            }
+            return null;
+          })();
         }
+        hostId = await hostInsertRef.current;
       }
       setHostGuestId(hostId);
       setGuests(guestList);
