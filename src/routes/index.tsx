@@ -188,7 +188,8 @@ function Index() {
             <Input
               value={code}
               onChange={(e) => {
-                setCode(e.target.value.toUpperCase());
+                const cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+                setCode(cleaned);
                 if (codeError) setCodeError(null);
               }}
               placeholder="6-character code"
