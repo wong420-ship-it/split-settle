@@ -141,7 +141,71 @@ function HostDashboard() {
     setAdding(false);
   };
 
-  if (loading || !session) {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !session) return;
+    setOcrLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("document", file);
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: fd,
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        toast.error(json.error || "Couldn't read receipt.");
+        return;
+      }
+      if (!json.items || json.items.length === 0) {
+        toast.error("Couldn't read items from this receipt — please add them manually.");
+        return;
+      }
+      setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
+      setReviewTax(typeof json.tax === "number" ? json.tax : null);
+      setReviewRestaurant(json.restaurant || null);
+      setReviewOpen(true);
+    } catch (err) {
+      toast.error("Receipt upload failed.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const saveReview = async () => {
+    if (!session) return;
+    const rows = reviewItems
+      .map((r) => ({ name: r.name.trim(), price: parseFloat(r.price) }))
+      .filter((r) => r.name && !isNaN(r.price) && r.price > 0);
+    if (rows.length === 0) {
+      toast.error("Add at least one valid item.");
+      return;
+    }
+    setSavingReview(true);
+    const { error } = await supabase
+      .from("bill_items")
+      .insert(rows.map((r) => ({ session_id: session.id, name: r.name, price: r.price })));
+    if (error) {
+      toast.error(error.message);
+      setSavingReview(false);
+      return;
+    }
+    const patch: Record<string, any> = {};
+    if (reviewTax != null) patch.tax_amount = reviewTax;
+    if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
+      patch.restaurant_name = reviewRestaurant;
+    }
+    if (Object.keys(patch).length) {
+      await supabase.from("bill_sessions").update(patch).eq("id", session.id);
+      setSession({ ...session, ...patch });
+    }
+    setSavingReview(false);
+    setReviewOpen(false);
+    toast.success(`Added ${rows.length} item${rows.length === 1 ? "" : "s"}.`);
+  };
     return (
       <AppShell>
         <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
