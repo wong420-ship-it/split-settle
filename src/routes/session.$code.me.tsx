@@ -215,7 +215,7 @@ function Me() {
           variant={paidAt ? "outline" : "default"}
           size="lg"
           className="h-12"
-          disabled={marking || !meId || myItems.length === 0}
+          disabled={marking || !meId}
           onClick={async () => {
             if (!meId) return;
             setMarking(true);
