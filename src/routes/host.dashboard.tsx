@@ -936,7 +936,7 @@ function HostDashboard() {
 
         {hostGuestId && (
           <section
-            className={`flex flex-col gap-3 rounded-2xl p-5 ${
+            className={`sticky bottom-2 z-10 flex flex-col gap-3 rounded-2xl p-5 shadow-lg ${
               hostPaidAt
                 ? "bg-secondary text-secondary-foreground"
                 : "bg-primary text-primary-foreground"
