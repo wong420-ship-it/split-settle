@@ -129,9 +129,20 @@ Return JSON exactly in this shape:
 
     const num = (v: any) => (typeof v === "number" ? v : v == null ? null : Number(v) || null);
 
+    const fees = Array.isArray(parsed.fees)
+      ? parsed.fees
+          .map((f: any) => ({
+            name: String(f?.name ?? "").trim() || "Fee",
+            amount: typeof f?.amount === "number" ? f.amount : Number(f?.amount),
+          }))
+          .filter((f: any) => Number.isFinite(f.amount) && f.amount > 0)
+          .map((f: any) => ({ name: f.name, amount: Number(f.amount.toFixed(2)) }))
+      : [];
+
     return json(
       {
         items,
+        fees,
         tax: num(parsed.tax),
         total: num(parsed.total),
         restaurant: parsed.restaurant ? String(parsed.restaurant) : null,
