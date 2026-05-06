@@ -10,33 +10,89 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as JoinCodeRouteImport } from './routes/join.$code'
+import { Route as HostDashboardRouteImport } from './routes/host.dashboard'
+import { Route as SessionCodeMeRouteImport } from './routes/session.$code.me'
+import { Route as SessionCodeClaimRouteImport } from './routes/session.$code.claim'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HostDashboardRoute = HostDashboardRouteImport.update({
+  id: '/host/dashboard',
+  path: '/host/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionCodeMeRoute = SessionCodeMeRouteImport.update({
+  id: '/session/$code/me',
+  path: '/session/$code/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionCodeClaimRoute = SessionCodeClaimRouteImport.update({
+  id: '/session/$code/claim',
+  path: '/session/$code/claim',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/host/dashboard': typeof HostDashboardRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/session/$code/claim': typeof SessionCodeClaimRoute
+  '/session/$code/me': typeof SessionCodeMeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/host/dashboard': typeof HostDashboardRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/session/$code/claim': typeof SessionCodeClaimRoute
+  '/session/$code/me': typeof SessionCodeMeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/host/dashboard': typeof HostDashboardRoute
+  '/join/$code': typeof JoinCodeRoute
+  '/session/$code/claim': typeof SessionCodeClaimRoute
+  '/session/$code/me': typeof SessionCodeMeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/host/dashboard'
+    | '/join/$code'
+    | '/session/$code/claim'
+    | '/session/$code/me'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/host/dashboard'
+    | '/join/$code'
+    | '/session/$code/claim'
+    | '/session/$code/me'
+  id:
+    | '__root__'
+    | '/'
+    | '/host/dashboard'
+    | '/join/$code'
+    | '/session/$code/claim'
+    | '/session/$code/me'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  HostDashboardRoute: typeof HostDashboardRoute
+  JoinCodeRoute: typeof JoinCodeRoute
+  SessionCodeClaimRoute: typeof SessionCodeClaimRoute
+  SessionCodeMeRoute: typeof SessionCodeMeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +104,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/host/dashboard': {
+      id: '/host/dashboard'
+      path: '/host/dashboard'
+      fullPath: '/host/dashboard'
+      preLoaderRoute: typeof HostDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session/$code/me': {
+      id: '/session/$code/me'
+      path: '/session/$code/me'
+      fullPath: '/session/$code/me'
+      preLoaderRoute: typeof SessionCodeMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session/$code/claim': {
+      id: '/session/$code/claim'
+      path: '/session/$code/claim'
+      fullPath: '/session/$code/claim'
+      preLoaderRoute: typeof SessionCodeClaimRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  HostDashboardRoute: HostDashboardRoute,
+  JoinCodeRoute: JoinCodeRoute,
+  SessionCodeClaimRoute: SessionCodeClaimRoute,
+  SessionCodeMeRoute: SessionCodeMeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
