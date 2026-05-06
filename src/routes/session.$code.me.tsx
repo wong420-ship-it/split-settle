@@ -256,6 +256,58 @@ function Me() {
             "Mark as paid"
           )}
         </Button>
+
+        {guests.length > 0 && (() => {
+          const paidCount = guests.filter((g) => g.paid_at).length;
+          const allPaid = paidCount === guests.length;
+          const pct = Math.round((paidCount / guests.length) * 100);
+          const unpaid = guests.filter((g) => !g.paid_at);
+          return (
+            <section
+              className={`rounded-2xl border p-4 ${
+                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+              }`}
+            >
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="text-foreground">
+                  {allPaid ? "Everyone has paid 🎉" : "Table payments"}
+                </span>
+                <span className="font-mono text-foreground">
+                  {paidCount} / {guests.length}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {guests.map((g) => (
+                  <li
+                    key={g.id}
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      g.paid_at
+                        ? "bg-primary/15 text-foreground"
+                        : "bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    {g.paid_at && <Check className="h-3 w-3 text-primary" />}
+                    <span>
+                      {g.display_name}
+                      {g.id === meId && " (you)"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {!allPaid && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Waiting on {unpaid.map((g) => (g.id === meId ? "you" : g.display_name)).join(", ")}
+                </p>
+              )}
+            </section>
+          );
+        })()}
         <Link to="/" className="text-center text-sm text-muted-foreground underline">
           Back to home
         </Link>
