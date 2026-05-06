@@ -209,6 +209,8 @@ function HostDashboard() {
 
   const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
 
+  const allGuestsPaid = guests.length > 0 && guests.every((g) => g.paid_at);
+
   const updateField = async (field: "tax_amount" | "tip_percentage", value: number) => {
     if (!session) return;
     setSession({ ...session, [field]: value });
@@ -442,7 +444,7 @@ function HostDashboard() {
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-foreground">{item.name}</span>
                       {splitN === 0 ? (
-                        <span className="text-xs text-muted-foreground">Unclaimed</span>
+                        <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-primary">
                           {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
@@ -706,15 +708,28 @@ function HostDashboard() {
           const paidCount = guests.filter((g) => g.paid_at).length;
           const allPaid = paidCount === guests.length;
           const pct = Math.round((paidCount / guests.length) * 100);
+          const unclaimedItems = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+          const unclaimedTotal = unclaimedItems.reduce((s, i) => s + Number(i.price), 0);
+          const hasUnclaimed = unclaimedItems.length > 0;
+          const paidButUnclaimed = allPaid && hasUnclaimed;
+          const fullyDone = allPaid && !hasUnclaimed;
           return (
             <section
               className={`rounded-2xl border p-4 ${
-                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+                paidButUnclaimed
+                  ? "border-destructive bg-destructive/10"
+                  : fullyDone
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card"
               }`}
             >
               <div className="flex items-center justify-between text-sm font-semibold">
-                <span className="text-foreground">
-                  {allPaid ? "Everyone has paid 🎉" : "Payments"}
+                <span className={paidButUnclaimed ? "text-destructive" : "text-foreground"}>
+                  {paidButUnclaimed
+                    ? "Paid — but items are unclaimed"
+                    : fullyDone
+                    ? "Everyone has paid 🎉"
+                    : "Payments"}
                 </span>
                 <span className="font-mono text-foreground">
                   {paidCount} / {guests.length}
@@ -722,7 +737,7 @@ function HostDashboard() {
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
                 <div
-                  className="h-full bg-primary transition-all"
+                  className={`h-full transition-all ${paidButUnclaimed ? "bg-destructive" : "bg-primary"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -734,6 +749,16 @@ function HostDashboard() {
                     .map((g) => g.display_name)
                     .join(", ")}
                 </p>
+              )}
+              {paidButUnclaimed && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-destructive">
+                    {unclaimedItems.map((i) => i.name).join(", ")} · ${unclaimedTotal.toFixed(2)} not covered
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Claim them yourself or assign to a guest before closing out.
+                  </p>
+                </div>
               )}
             </section>
           );

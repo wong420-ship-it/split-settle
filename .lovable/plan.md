@@ -1,43 +1,44 @@
-## Goal
-Allow multiple guests to share a single item (e.g. split fries 2-ways), with the cost divided evenly among everyone who claimed it.
+## Problem
 
-## Data model change
-Replace the single `claimed_by_user_id` column on `bill_items` with a many-to-many join table:
+When every guest has marked themselves paid, the host's payments card flips to the celebratory "Everyone has paid 🎉" state — even if one or more items on the receipt were never claimed by anyone. Those unclaimed items silently fall off the bill, so the host thinks they're done when they actually undercharged the table.
 
-```text
-item_claims
-  item_id     uuid  -> bill_items.id (cascade delete)
-  user_id     uuid  -> session_users.id (cascade delete)
-  claimed_at  timestamptz default now()
-  PRIMARY KEY (item_id, user_id)
+## Fix
+
+In `src/routes/host.dashboard.tsx`, detect this combined state and surface it clearly so the celebration doesn't hide a real gap.
+
+### 1. Compute unclaimed items
+
+Inside the payments section IIFE (around line 705), derive the list of unclaimed items from existing state:
+
+```ts
+const unclaimedItems = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+const unclaimedTotal = unclaimedItems.reduce((s, i) => s + Number(i.price), 0);
+const hasUnclaimed = unclaimedItems.length > 0;
 ```
 
-RLS: same permissive "anyone can read/insert/delete" pattern already used on `bill_items` (no auth for guests). Add `item_claims` to the realtime publication.
+No new data fetching — `items` and `claimsByItem` are already in scope.
 
-We will drop `claimed_by_user_id` from `bill_items` after migrating any existing rows into `item_claims`.
+### 2. Suppress the false "all done" state
 
-## Claim screen behavior (`session.$code.claim.tsx`)
-- Fetch claims alongside items; group by `item_id` to know who claimed each.
-- A row shows up to N avatars/initials of claimers and a per-person price = `item.price / claimers.length`.
-- Tap behavior:
-  - If I haven't claimed it → insert `(item_id, my_user_id)` into `item_claims`.
-  - If I have claimed it → delete my row (un-claim my share).
-  - Items are NEVER locked — anyone can join an existing claim to split it.
-- Subscribe to realtime changes on both `bill_items` and `item_claims` for the session so splits update live.
-- "Your total" at the bottom = sum over my claimed items of `item.price / claimers.length`.
+Change the celebration condition so it only fires when payments AND claims are both complete:
 
-## Summary screen (`session.$code.me.tsx`)
-- "What you ordered" lists each item I claimed with my share = `price / numClaimers`, and shows "shared with X others" when applicable.
-- Subtotal/tax/tip math uses my per-item shares (not full item price). Bill subtotal stays the sum of all item prices, so tax/tip proration still works.
+- `allPaid && !hasUnclaimed` → keep the green "Everyone has paid 🎉" card as-is.
+- `allPaid && hasUnclaimed` → render a warning variant of the same card instead:
+  - Border/background: `border-destructive bg-destructive/10` (matches the existing destructive token used elsewhere in the app).
+  - Headline: "Paid — but items are unclaimed".
+  - Subtext lists the unclaimed item names and the unclaimed subtotal, e.g. *"Truffle fries, Side salad · $14.50 not covered"*.
+  - Short hint: "Claim them yourself or assign to a guest before closing out."
+- `!allPaid` → unchanged (existing "Waiting on …" copy).
 
-## Host views
-Quick audit of `host.dashboard.tsx` to update any place that reads `claimed_by_user_id` (likely just status indicators) so it reflects the claim list instead.
+### 3. Also flag it on the Items list (lightweight)
 
-## Out of scope
-- Uneven splits (e.g. 70/30). Even-split only for v1.
-- Auth changes — guests stay identified by localStorage `session_users.id`.
+The per-item "Unclaimed" label (line 445) is currently muted gray. When `allPaid && hasUnclaimed`, render that label in `text-destructive` instead so the offending rows visually match the warning banner. Normal in-progress sessions keep the muted styling so we don't cry wolf while people are still claiming.
 
-## Technical notes
-- Migration: create `item_claims`, copy existing `(id, claimed_by_user_id)` rows where non-null, then `ALTER TABLE bill_items DROP COLUMN claimed_by_user_id, DROP COLUMN claimed_at`.
-- Add `ALTER PUBLICATION supabase_realtime ADD TABLE public.item_claims;`.
-- Update Supabase types are auto-regenerated.
+### Out of scope
+
+- No schema changes, no new actions. The host can already claim items themselves or assign via the existing popover — this change is purely about making the gap visible.
+- No change to guest-facing screens.
+
+## Files
+
+- `src/routes/host.dashboard.tsx` — payments section conditional + items list label color.
