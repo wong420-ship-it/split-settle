@@ -88,7 +88,15 @@ function Index() {
   const joinBill = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.length < 4) return;
+    setCodeError(null);
+    if (trimmed.length !== 6) {
+      setCodeError("Codes are 6 characters.");
+      return;
+    }
+    if (!/^[A-Z0-9]+$/.test(trimmed)) {
+      setCodeError("Letters and numbers only.");
+      return;
+    }
     setLoading("join");
     const { data, error } = await supabase
       .from("bill_sessions")
@@ -96,11 +104,13 @@ function Index() {
       .eq("share_code", trimmed)
       .maybeSingle();
     if (error) {
+      setCodeError("Couldn't check that code. Try again.");
       toast.error("Couldn't check code. Try again.");
       setLoading(null);
       return;
     }
     if (!data) {
+      setCodeError(`Code "${trimmed}" not found. Double-check with your host.`);
       toast.error("Code not found");
       setLoading(null);
       return;
