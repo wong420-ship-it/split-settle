@@ -55,6 +55,7 @@ function HostDashboard() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
   const [reviewTax, setReviewTax] = useState<number | null>(null);
+  const [reviewFees, setReviewFees] = useState<{ name: string; amount: string }[]>([]);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -288,6 +289,11 @@ function HostDashboard() {
       }
       setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
       setReviewTax(typeof json.tax === "number" ? json.tax : null);
+      setReviewFees(
+        Array.isArray(json.fees)
+          ? json.fees.map((f: any) => ({ name: String(f.name ?? "Fee"), amount: String(f.amount) }))
+          : [],
+      );
       setReviewRestaurant(json.restaurant || null);
       setReviewOpen(true);
       clearPending();
@@ -334,8 +340,14 @@ function HostDashboard() {
       const fresh = (inserted as Item[]).filter((i) => !ids.has(i.id));
       return [...prev, ...fresh];
     });
+    const feesTotal = reviewFees.reduce((s, f) => {
+      const n = parseFloat(f.amount);
+      return Number.isFinite(n) && n > 0 ? s + n : s;
+    }, 0);
     const patch: { tax_amount?: number; restaurant_name?: string } = {};
-    if (reviewTax != null) patch.tax_amount = reviewTax;
+    if (reviewTax != null || feesTotal > 0) {
+      patch.tax_amount = (reviewTax ?? 0) + feesTotal;
+    }
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
       patch.restaurant_name = reviewRestaurant;
     }
@@ -819,9 +831,72 @@ function HostDashboard() {
               <Plus className="mr-1 h-4 w-4" /> Add row
             </Button>
           </div>
-          {reviewTax != null && (
-            <p className="text-sm text-muted-foreground">Tax detected: ${reviewTax.toFixed(2)}</p>
-          )}
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Tax & fees
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setReviewFees([...reviewFees, { name: "", amount: "" }])}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Add fee
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input value="Tax" disabled className="flex-1" />
+              <Input
+                type="number"
+                step="0.01"
+                value={reviewTax ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setReviewTax(v === "" ? null : parseFloat(v));
+                }}
+                placeholder="0.00"
+                className="w-20"
+              />
+            </div>
+            {reviewFees.map((fee, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  value={fee.name}
+                  onChange={(e) => {
+                    const next = [...reviewFees];
+                    next[idx] = { ...next[idx], name: e.target.value };
+                    setReviewFees(next);
+                  }}
+                  placeholder="Service fee"
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={fee.amount}
+                  onChange={(e) => {
+                    const next = [...reviewFees];
+                    next[idx] = { ...next[idx], amount: e.target.value };
+                    setReviewFees(next);
+                  }}
+                  placeholder="0.00"
+                  className="w-20"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setReviewFees(reviewFees.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              Tax & fees are split across the table proportionally to each person's share.
+            </p>
+          </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setReviewOpen(false)} disabled={savingReview}>
               Cancel
