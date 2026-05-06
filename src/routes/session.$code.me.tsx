@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getGuest } from "@/lib/guest";
+import { Check } from "lucide-react";
+import { toast } from "sonner";
 
 type Session = { id: string; restaurant_name: string; tax_amount: number; tip_percentage: number };
 type Item = { id: string; name: string; price: number };
@@ -27,6 +29,9 @@ function Me() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [paidAt, setPaidAt] = useState<string | null>(null);
+  const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     const guest = getGuest(code);
@@ -59,6 +64,12 @@ function Me() {
           .in("item_id", itemList.map((i) => i.id));
         setClaims((cs ?? []) as Claim[]);
       }
+      const { data: meRow } = await supabase
+        .from("session_users")
+        .select("paid_at")
+        .eq("id", guest.id)
+        .maybeSingle();
+      setPaidAt((meRow as { paid_at: string | null } | null)?.paid_at ?? null);
       setLoading(false);
     })();
   }, [code, navigate]);
@@ -139,12 +150,56 @@ function Me() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-primary p-5 text-primary-foreground">
-          <div className="text-xs uppercase tracking-wider opacity-80">You owe</div>
+        <section
+          className={`rounded-2xl p-5 ${
+            paidAt
+              ? "bg-secondary text-secondary-foreground"
+              : "bg-primary text-primary-foreground"
+          }`}
+        >
+          <div className="text-xs uppercase tracking-wider opacity-80">
+            {paidAt ? "You paid" : "You owe"}
+          </div>
           <div className="font-mono text-4xl font-bold">${total.toFixed(2)}</div>
+          {paidAt && (
+            <div className="mt-1 text-xs opacity-80">
+              Marked paid {new Date(paidAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </div>
+          )}
         </section>
 
-        <Button variant="outline" size="lg" className="h-12">Mark as paid</Button>
+        <Button
+          variant={paidAt ? "outline" : "default"}
+          size="lg"
+          className="h-12"
+          disabled={marking || !meId || myItems.length === 0}
+          onClick={async () => {
+            if (!meId) return;
+            setMarking(true);
+            const next = paidAt ? null : new Date().toISOString();
+            const prev = paidAt;
+            setPaidAt(next);
+            const { error } = await supabase
+              .from("session_users")
+              .update({ paid_at: next })
+              .eq("id", meId);
+            setMarking(false);
+            if (error) {
+              setPaidAt(prev);
+              toast.error("Couldn't update — try again.");
+              return;
+            }
+            toast.success(next ? "Marked as paid" : "Marked unpaid");
+          }}
+        >
+          {paidAt ? (
+            <>
+              <Check className="mr-2 h-4 w-4" /> Paid — tap to undo
+            </>
+          ) : (
+            "Mark as paid"
+          )}
+        </Button>
         <Link to="/" className="text-center text-sm text-muted-foreground underline">
           Back to home
         </Link>
