@@ -295,6 +295,7 @@ function HostDashboard() {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview);
     setPendingFile(file);
     setPendingPreview(URL.createObjectURL(file));
+    void processReceipt(file);
   };
 
   const clearPending = () => {
@@ -303,12 +304,13 @@ function HostDashboard() {
     setPendingPreview(null);
   };
 
-  const processReceipt = async () => {
-    if (!pendingFile || !session) return;
+  const processReceipt = async (fileArg?: File) => {
+    const file = fileArg ?? pendingFile;
+    if (!file || !session) return;
     setOcrLoading(true);
     try {
       const fd = new FormData();
-      fd.append("document", pendingFile);
+      fd.append("document", file);
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
       const resp = await fetch(url, {
         method: "POST",
@@ -605,29 +607,20 @@ function HostDashboard() {
                     {pendingFile?.name || "Receipt"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Ready to scan. Review the image, then read items.
+                    {ocrLoading ? "Reading receipt…" : "Processing…"}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              {!ocrLoading && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={clearPending}
-                  disabled={ocrLoading}
-                  className="h-10 flex-1"
+                  className="h-10 w-full"
                 >
-                  Remove
+                  Cancel
                 </Button>
-                <Button
-                  type="button"
-                  onClick={processReceipt}
-                  disabled={ocrLoading}
-                  className="h-10 flex-1"
-                >
-                  {ocrLoading ? "Reading…" : "Read items"}
-                </Button>
-              </div>
+              )}
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-2">

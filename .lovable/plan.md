@@ -1,58 +1,15 @@
-## Bug
+## Goal
 
-When a host opens an old bill from history on a different device (or after clearing site data), `host.dashboard.tsx` cannot find the saved `seatsolo:host-guest:<sessionId>` key in `localStorage`, so it inserts a brand-new "(host)" row in `session_users` every visit. The screenshot shows three "Jonathan Wong (host)" entries from three opens.
+Remove the extra "Read items" tap. As soon as a host picks a photo (camera or file), kick off OCR automatically.
 
-There is also no DB-level uniqueness preventing duplicates, so multiple tabs / devices can each create their own.
+## Changes (`src/routes/host.dashboard.tsx`)
 
-## Fix
-
-In `src/routes/host.dashboard.tsx`, before falling through to the insert path, check the already-loaded `guestList` for any existing guest whose `display_name` ends with `" (host)"`. If one exists, adopt it as the host's guest row and write its id back to `localStorage` so subsequent loads stay stable.
-
-Logic added between the localStorage lookup and the insert block:
-
-```ts
-if (!existingHost) {
-  existingHost = guestList.find((g) => / \(host\)$/.test(g.display_name)) ?? null;
-  if (existingHost) {
-    hostId = existingHost.id;
-    localStorage.setItem(hostKey, existingHost.id);
-  }
-}
-```
-
-The existing insert path remains as a last resort for genuinely new sessions.
-
-## Cleanup of existing duplicates
-
-For sessions that already have multiple "(host)" rows (like the one in the screenshot), we keep the oldest one (matched by `created_at asc`) and delete the others, plus any `item_claims` they hold. Done as a one-shot SQL migration:
-
-```sql
-WITH ranked AS (
-  SELECT id, session_id,
-         row_number() OVER (PARTITION BY session_id
-                            ORDER BY created_at ASC) AS rn
-  FROM public.session_users
-  WHERE display_name LIKE '% (host)'
-)
-DELETE FROM public.item_claims
-WHERE user_id IN (SELECT id FROM ranked WHERE rn > 1);
-
-WITH ranked AS (
-  SELECT id, session_id,
-         row_number() OVER (PARTITION BY session_id
-                            ORDER BY created_at ASC) AS rn
-  FROM public.session_users
-  WHERE display_name LIKE '% (host)'
-)
-DELETE FROM public.session_users
-WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
-```
+1. **`handleReceiptSelect`**: After setting `pendingFile`/`pendingPreview`, immediately call `processReceipt(file)` instead of waiting for a button tap.
+2. **`processReceipt`**: Accept the file as an argument (fallback to `pendingFile`) so it doesn't race with the just-set state.
+3. **Preview UI (lines ~595–631)**: While `ocrLoading`, show the preview thumbnail with a "Reading receipt…" status and a spinner. Replace the two-button row with a single "Cancel" (disabled while loading is mid-flight, or allow abort — keep simple: hide cancel during loading). Drop the "Read items" button entirely.
+4. **Error path**: If OCR fails or returns no items, keep `pendingPreview` cleared (already does) and surface the existing toast — user can re-pick. No retry button needed since re-tapping Camera/Upload restarts the flow.
 
 ## Out of scope
 
-- Adding a true DB unique constraint (would require a `is_host` column or similar schema change). The display-name check + localStorage is enough to stop the duplicates in practice.
-
-## Files
-
-- Edit: `src/routes/host.dashboard.tsx`
-- New migration: cleanup duplicate "(host)" rows
+- Adding an abort/cancel mid-OCR (network call is ~5–45s; not worth the complexity now).
+- Changing the camera/upload entry buttons.
