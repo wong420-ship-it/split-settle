@@ -1,11 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Check, Copy, Plus, Users } from "lucide-react";
+import { Check, Copy, Plus, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type Session = {
   id: string;
@@ -39,6 +46,13 @@ function HostDashboard() {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [adding, setAdding] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
+  const [reviewTax, setReviewTax] = useState<number | null>(null);
+  const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
+  const [savingReview, setSavingReview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load session + verify auth
   useEffect(() => {
@@ -127,6 +141,72 @@ function HostDashboard() {
     setAdding(false);
   };
 
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !session) return;
+    setOcrLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("document", file);
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: fd,
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        toast.error(json.error || "Couldn't read receipt.");
+        return;
+      }
+      if (!json.items || json.items.length === 0) {
+        toast.error("Couldn't read items from this receipt — please add them manually.");
+        return;
+      }
+      setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
+      setReviewTax(typeof json.tax === "number" ? json.tax : null);
+      setReviewRestaurant(json.restaurant || null);
+      setReviewOpen(true);
+    } catch (err) {
+      toast.error("Receipt upload failed.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const saveReview = async () => {
+    if (!session) return;
+    const rows = reviewItems
+      .map((r) => ({ name: r.name.trim(), price: parseFloat(r.price) }))
+      .filter((r) => r.name && !isNaN(r.price) && r.price > 0);
+    if (rows.length === 0) {
+      toast.error("Add at least one valid item.");
+      return;
+    }
+    setSavingReview(true);
+    const { error } = await supabase
+      .from("bill_items")
+      .insert(rows.map((r) => ({ session_id: session.id, name: r.name, price: r.price })));
+    if (error) {
+      toast.error(error.message);
+      setSavingReview(false);
+      return;
+    }
+    const patch: { tax_amount?: number; restaurant_name?: string } = {};
+    if (reviewTax != null) patch.tax_amount = reviewTax;
+    if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
+      patch.restaurant_name = reviewRestaurant;
+    }
+    if (Object.keys(patch).length) {
+      await supabase.from("bill_sessions").update(patch).eq("id", session.id);
+      setSession({ ...session, ...patch });
+    }
+    setSavingReview(false);
+    setReviewOpen(false);
+    toast.success(`Added ${rows.length} item${rows.length === 1 ? "" : "s"}.`);
+  };
+
   if (loading || !session) {
     return (
       <AppShell>
@@ -190,6 +270,24 @@ function HostDashboard() {
               <Plus className="h-4 w-4" />
             </Button>
           </form>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleReceiptUpload}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={ocrLoading}
+            className="mt-2 h-10 w-full"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {ocrLoading ? "Reading your receipt…" : "Upload receipt"}
+          </Button>
         </section>
 
         <section className="grid grid-cols-2 gap-3">
@@ -275,6 +373,71 @@ function HostDashboard() {
           <Button variant="outline" size="lg" className="h-12 w-full text-base">View as guest →</Button>
         </Link>
       </div>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review receipt items</DialogTitle>
+          </DialogHeader>
+          {reviewRestaurant && (
+            <p className="text-sm text-muted-foreground">From: {reviewRestaurant}</p>
+          )}
+          <div className="flex flex-col gap-2">
+            {reviewItems.map((row, idx) => (
+              <div key={idx} className="flex gap-2">
+                <Input
+                  value={row.name}
+                  onChange={(e) => {
+                    const next = [...reviewItems];
+                    next[idx] = { ...next[idx], name: e.target.value };
+                    setReviewItems(next);
+                  }}
+                  placeholder="Item"
+                  className="flex-1"
+                />
+                <Input
+                  value={row.price}
+                  onChange={(e) => {
+                    const next = [...reviewItems];
+                    next[idx] = { ...next[idx], price: e.target.value };
+                    setReviewItems(next);
+                  }}
+                  type="number"
+                  step="0.01"
+                  className="w-20"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setReviewItems(reviewItems.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setReviewItems([...reviewItems, { name: "", price: "" }])}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add row
+            </Button>
+          </div>
+          {reviewTax != null && (
+            <p className="text-sm text-muted-foreground">Tax detected: ${reviewTax.toFixed(2)}</p>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReviewOpen(false)} disabled={savingReview}>
+              Cancel
+            </Button>
+            <Button onClick={saveReview} disabled={savingReview}>
+              {savingReview ? "Adding…" : "Add to bill"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
