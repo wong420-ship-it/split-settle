@@ -627,74 +627,138 @@ function HostDashboard() {
                 const claimers = claimsByItem.get(item.id) ?? [];
                 const splitN = claimers.length;
                 const claimerSet = new Set(claimers);
+                const isEditing = editingId === item.id;
                 return (
                   <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-foreground">{item.name}</span>
-                      {splitN === 0 ? (
-                        <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-primary">
-                          {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                          <span className="truncate">
-                            {claimers.map(guestName).join(", ")}
-                            {splitN > 1 && ` · split ${splitN} ways`}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex flex-col items-end">
-                        <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
-                        {splitN > 1 && (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            ${(Number(item.price) / splitN).toFixed(2)} ea
-                          </span>
-                        )}
-                      </div>
-                      <Popover>
-                        <PopoverTrigger asChild>
+                    {isEditing ? (
+                      <div className="flex w-full flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Item name"
+                            className="h-9 flex-1"
+                            autoFocus
+                          />
+                          <Input
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(e.target.value)}
+                            placeholder="0.00"
+                            type="number"
+                            step="0.01"
+                            className="h-9 w-20"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={guests.length === 0}
-                            aria-label="Assign item"
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
                           >
-                            <UserPlus className="h-3.5 w-3.5" />
+                            Cancel
                           </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-56 p-2">
-                          <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Assign to
-                          </div>
-                          {guests.length === 0 ? (
-                            <p className="px-2 py-1 text-xs text-muted-foreground">No one's joined yet.</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => saveEdit(item.id)}
+                            disabled={savingEdit}
+                          >
+                            {savingEdit ? "Saving…" : "Save"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="text-foreground">{item.name}</span>
+                          {splitN === 0 ? (
+                            <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
                           ) : (
-                            <ul className="flex flex-col">
-                              {guests.map((g) => {
-                                const checked = claimerSet.has(g.id);
-                                return (
-                                  <li key={g.id}>
-                                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary">
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={() => toggleClaim(item.id, g.id, checked)}
-                                      />
-                                      <span className="flex-1 truncate">
-                                        {g.display_name}
-                                        {g.id === hostGuestId && " (you)"}
-                                      </span>
-                                    </label>
-                                  </li>
-                                );
-                              })}
-                            </ul>
+                            <span className="inline-flex items-center gap-1 text-xs text-primary">
+                              {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                              <span className="truncate">
+                                {claimers.map(guestName).join(", ")}
+                                {splitN > 1 && ` · split ${splitN} ways`}
+                              </span>
+                            </span>
                           )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex flex-col items-end">
+                            <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
+                            {splitN > 1 && (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                ${(Number(item.price) / splitN).toFixed(2)} ea
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
+                            onClick={() => startEditItem(item)}
+                            aria-label="Edit item"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={guests.length === 0}
+                                aria-label="Assign item"
+                              >
+                                <UserPlus className="h-3.5 w-3.5" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-2">
+                              <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Assign to
+                              </div>
+                              {guests.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-muted-foreground">No one's joined yet.</p>
+                              ) : (
+                                <ul className="flex flex-col">
+                                  {guests.map((g) => {
+                                    const checked = claimerSet.has(g.id);
+                                    return (
+                                      <li key={g.id}>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary">
+                                          <Checkbox
+                                            checked={checked}
+                                            onCheckedChange={() => toggleClaim(item.id, g.id, checked)}
+                                          />
+                                          <span className="flex-1 truncate">
+                                            {g.display_name}
+                                            {g.id === hostGuestId && " (you)"}
+                                          </span>
+                                        </label>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteId(item.id)}
+                            aria-label="Delete item"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </li>
                 );
               })}
