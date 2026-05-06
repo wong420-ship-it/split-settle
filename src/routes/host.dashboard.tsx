@@ -467,19 +467,14 @@ function HostDashboard() {
         </section>
 
         <section className="grid grid-cols-2 gap-3">
-          <label className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tax</div>
             <div className="mt-2 flex items-center gap-1">
               <span className="text-muted-foreground">$</span>
-              <Input
-                type="number"
-                step="0.01"
-                value={tax}
-                onChange={(e) => updateField("tax_amount", parseFloat(e.target.value) || 0)}
-                className="h-8 border-0 p-0 text-lg font-semibold focus-visible:ring-0"
-              />
+              <span className="text-lg font-semibold text-foreground">{tax.toFixed(2)}</span>
             </div>
-          </label>
+            <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">From receipt</div>
+          </div>
           <label className="rounded-2xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tip</div>
             <div className="mt-2 flex items-center gap-1">
