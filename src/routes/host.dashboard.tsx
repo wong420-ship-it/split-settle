@@ -209,6 +209,8 @@ function HostDashboard() {
 
   const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
 
+  const allGuestsPaid = guests.length > 0 && guests.every((g) => g.paid_at);
+
   const updateField = async (field: "tax_amount" | "tip_percentage", value: number) => {
     if (!session) return;
     setSession({ ...session, [field]: value });
