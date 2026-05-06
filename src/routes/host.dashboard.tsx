@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Camera, Check, Copy, Plus, Trash2, Upload, UserPlus, Users } from "lucide-react";
+import { Camera, Check, Copy, History, Plus, Trash2, Upload, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
