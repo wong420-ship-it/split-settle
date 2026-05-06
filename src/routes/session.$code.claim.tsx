@@ -167,6 +167,9 @@ function Claim() {
 
   const toggle = async (item: Item) => {
     if (!meId) return;
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(10);
+    }
     const claimers = claimsByItem.get(item.id) ?? [];
     const mine = claimers.includes(meId);
     if (mine) {
