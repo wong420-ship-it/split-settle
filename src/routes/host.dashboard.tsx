@@ -1297,6 +1297,21 @@ function HostDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!removeGuestTarget} onOpenChange={(open) => !open && setRemoveGuestTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {removeGuestTarget?.display_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They'll be removed from the bill and any items they claimed will become unclaimed. They can rejoin with the share code.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveGuest}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
