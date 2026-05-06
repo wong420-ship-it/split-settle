@@ -144,14 +144,27 @@ function HostDashboard() {
     setAdding(false);
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !session) return;
+    if (!file) return;
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(file);
+    setPendingPreview(URL.createObjectURL(file));
+  };
+
+  const clearPending = () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(null);
+    setPendingPreview(null);
+  };
+
+  const processReceipt = async () => {
+    if (!pendingFile || !session) return;
     setOcrLoading(true);
     try {
       const fd = new FormData();
-      fd.append("document", file);
+      fd.append("document", pendingFile);
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
       const resp = await fetch(url, {
         method: "POST",
@@ -165,12 +178,14 @@ function HostDashboard() {
       }
       if (!json.items || json.items.length === 0) {
         toast.error("Couldn't read items from this receipt — please add them manually.");
+        clearPending();
         return;
       }
       setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
       setReviewTax(typeof json.tax === "number" ? json.tax : null);
       setReviewRestaurant(json.restaurant || null);
       setReviewOpen(true);
+      clearPending();
     } catch (err) {
       toast.error("Receipt upload failed.");
     } finally {
