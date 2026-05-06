@@ -55,6 +55,7 @@ function HostDashboard() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
   const [reviewTax, setReviewTax] = useState<number | null>(null);
+  const [reviewFees, setReviewFees] = useState<{ name: string; amount: string }[]>([]);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
