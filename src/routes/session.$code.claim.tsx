@@ -53,8 +53,16 @@ function Claim() {
         supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
         supabase.from("session_users").select("id, display_name").eq("session_id", s.id),
       ]);
+      const guestList = (gs ?? []) as Guest[];
+      // If the locally-stored guest no longer exists (deleted by host),
+      // clear local state and re-join. Prevents silent RLS failures on writes.
+      if (!guestList.find((g) => g.id === guest.id)) {
+        clearGuest(code);
+        navigate({ to: "/join/$code", params: { code } });
+        return;
+      }
       setItems((its ?? []) as Item[]);
-      setGuests((gs ?? []) as Guest[]);
+      setGuests(guestList);
       const itemIds = (its ?? []).map((i: any) => i.id);
       if (itemIds.length) {
         const { data: cs } = await supabase
