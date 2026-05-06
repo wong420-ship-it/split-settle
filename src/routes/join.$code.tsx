@@ -75,6 +75,7 @@ function Join() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="First name"
+            maxLength={40}
             className="h-14 text-center text-lg"
           />
           <Button type="submit" size="lg" className="h-12 text-base" disabled={!name.trim() || loading}>
