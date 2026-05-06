@@ -304,12 +304,13 @@ function HostDashboard() {
     setPendingPreview(null);
   };
 
-  const processReceipt = async () => {
-    if (!pendingFile || !session) return;
+  const processReceipt = async (fileArg?: File) => {
+    const file = fileArg ?? pendingFile;
+    if (!file || !session) return;
     setOcrLoading(true);
     try {
       const fd = new FormData();
-      fd.append("document", pendingFile);
+      fd.append("document", file);
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
       const resp = await fetch(url, {
         method: "POST",
