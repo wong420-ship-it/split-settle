@@ -247,14 +247,32 @@ function HostDashboard() {
       return;
     }
     setSavingReview(true);
-    const { error } = await supabase
+    const payload = rows.map((r) => ({ session_id: session.id, name: r.name, price: r.price }));
+    const { data: inserted, error } = await supabase
       .from("bill_items")
-      .insert(rows.map((r) => ({ session_id: session.id, name: r.name, price: r.price })));
+      .insert(payload)
+      .select("id, name, price");
     if (error) {
-      toast.error(error.message);
+      console.error("[parse-receipt] insert failed:", error);
+      toast.error(`Couldn't add items: ${error.message}`);
       setSavingReview(false);
       return;
     }
+    if (!inserted || inserted.length === 0) {
+      console.error("[parse-receipt] insert returned no rows", { payload });
+      toast.error("Items didn't save. Please try again or add manually.");
+      setSavingReview(false);
+      return;
+    }
+    if (inserted.length !== rows.length) {
+      toast.warning(`Only ${inserted.length} of ${rows.length} items saved.`);
+    }
+    // Optimistically merge so the user sees them immediately even if realtime is delayed
+    setItems((prev) => {
+      const ids = new Set(prev.map((p) => p.id));
+      const fresh = (inserted as Item[]).filter((i) => !ids.has(i.id));
+      return [...prev, ...fresh];
+    });
     const patch: { tax_amount?: number; restaurant_name?: string } = {};
     if (reviewTax != null) patch.tax_amount = reviewTax;
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
@@ -266,7 +284,7 @@ function HostDashboard() {
     }
     setSavingReview(false);
     setReviewOpen(false);
-    toast.success(`Added ${rows.length} item${rows.length === 1 ? "" : "s"}.`);
+    toast.success(`Added ${inserted.length} item${inserted.length === 1 ? "" : "s"}.`);
   };
 
   if (loading || !session) {
