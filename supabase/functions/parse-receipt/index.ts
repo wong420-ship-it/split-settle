@@ -110,12 +110,19 @@ Return JSON exactly in this shape:
     }
 
     const items = Array.isArray(parsed.items)
-      ? parsed.items
-          .map((i: any) => ({
-            name: String(i?.name ?? "").trim() || "Item",
-            price: typeof i?.price === "number" ? i.price : Number(i?.price) || 0,
-          }))
-          .filter((i: any) => i.price > 0)
+      ? parsed.items.flatMap((i: any) => {
+          const name = String(i?.name ?? "").trim() || "Item";
+          const rawQty = Number(i?.quantity);
+          const qty = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
+          let unit = typeof i?.unit_price === "number" ? i.unit_price : Number(i?.unit_price);
+          if (!Number.isFinite(unit) || unit <= 0) {
+            // Fallback: legacy "price" field treated as line total
+            const legacy = typeof i?.price === "number" ? i.price : Number(i?.price);
+            if (Number.isFinite(legacy) && legacy > 0) unit = legacy / qty;
+          }
+          if (!Number.isFinite(unit) || unit <= 0) return [];
+          return Array.from({ length: qty }, () => ({ name, price: Number(unit.toFixed(2)) }));
+        })
       : [];
 
     const num = (v: any) => (typeof v === "number" ? v : v == null ? null : Number(v) || null);
