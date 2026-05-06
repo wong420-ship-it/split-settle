@@ -110,7 +110,8 @@ function HostDashboard() {
   const updateField = async (field: "tax_amount" | "tip_percentage", value: number) => {
     if (!session) return;
     setSession({ ...session, [field]: value });
-    await supabase.from("bill_sessions").update({ [field]: value }).eq("id", session.id);
+    const patch = field === "tax_amount" ? { tax_amount: value } : { tip_percentage: value };
+    await supabase.from("bill_sessions").update(patch).eq("id", session.id);
   };
 
   const addItem = async (e: React.FormEvent) => {
