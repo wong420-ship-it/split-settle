@@ -23,6 +23,7 @@ type Session = {
 };
 type Item = { id: string; name: string; price: number };
 type Guest = { id: string; display_name: string };
+type Claim = { item_id: string; user_id: string };
 
 export const Route = createFileRoute("/host/dashboard")({
   validateSearch: (s: Record<string, unknown>) => ({ code: (s.code as string) || "" }),
