@@ -228,6 +228,27 @@ function HostDashboard() {
     setAdding(false);
   };
 
+  const toggleClaim = async (itemId: string, userId: string, claimed: boolean) => {
+    setClaims((prev) =>
+      claimed
+        ? prev.filter((c) => !(c.item_id === itemId && c.user_id === userId))
+        : [...prev, { item_id: itemId, user_id: userId }],
+    );
+    if (claimed) {
+      const { error } = await supabase
+        .from("item_claims")
+        .delete()
+        .eq("item_id", itemId)
+        .eq("user_id", userId);
+      if (error) toast.error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("item_claims")
+        .insert({ item_id: itemId, user_id: userId });
+      if (error) toast.error(error.message);
+    }
+  };
+
   const handleReceiptSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
