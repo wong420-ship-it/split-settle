@@ -150,12 +150,56 @@ function Me() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-primary p-5 text-primary-foreground">
-          <div className="text-xs uppercase tracking-wider opacity-80">You owe</div>
+        <section
+          className={`rounded-2xl p-5 ${
+            paidAt
+              ? "bg-secondary text-secondary-foreground"
+              : "bg-primary text-primary-foreground"
+          }`}
+        >
+          <div className="text-xs uppercase tracking-wider opacity-80">
+            {paidAt ? "You paid" : "You owe"}
+          </div>
           <div className="font-mono text-4xl font-bold">${total.toFixed(2)}</div>
+          {paidAt && (
+            <div className="mt-1 text-xs opacity-80">
+              Marked paid {new Date(paidAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </div>
+          )}
         </section>
 
-        <Button variant="outline" size="lg" className="h-12">Mark as paid</Button>
+        <Button
+          variant={paidAt ? "outline" : "default"}
+          size="lg"
+          className="h-12"
+          disabled={marking || !meId || myItems.length === 0}
+          onClick={async () => {
+            if (!meId) return;
+            setMarking(true);
+            const next = paidAt ? null : new Date().toISOString();
+            const prev = paidAt;
+            setPaidAt(next);
+            const { error } = await supabase
+              .from("session_users")
+              .update({ paid_at: next })
+              .eq("id", meId);
+            setMarking(false);
+            if (error) {
+              setPaidAt(prev);
+              toast.error("Couldn't update — try again.");
+              return;
+            }
+            toast.success(next ? "Marked as paid" : "Marked unpaid");
+          }}
+        >
+          {paidAt ? (
+            <>
+              <Check className="mr-2 h-4 w-4" /> Paid — tap to undo
+            </>
+          ) : (
+            "Mark as paid"
+          )}
+        </Button>
         <Link to="/" className="text-center text-sm text-muted-foreground underline">
           Back to home
         </Link>
