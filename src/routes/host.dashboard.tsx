@@ -372,8 +372,10 @@ function HostDashboard() {
       return Number.isFinite(n) && n > 0 ? s + n : s;
     }, 0);
     const patch: { tax_amount?: number; restaurant_name?: string } = {};
-    if (reviewTax != null || feesTotal > 0) {
-      patch.tax_amount = (reviewTax ?? 0) + feesTotal;
+    const addTax = (reviewTax ?? 0) + feesTotal;
+    if (addTax > 0) {
+      // Append to existing tax instead of overwriting (e.g. multiple receipts).
+      patch.tax_amount = Number(session.tax_amount ?? 0) + addTax;
     }
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
       patch.restaurant_name = reviewRestaurant;
