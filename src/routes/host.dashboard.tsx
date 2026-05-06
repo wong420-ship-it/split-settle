@@ -373,6 +373,71 @@ function HostDashboard() {
           <Button variant="outline" size="lg" className="h-12 w-full text-base">View as guest →</Button>
         </Link>
       </div>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review receipt items</DialogTitle>
+          </DialogHeader>
+          {reviewRestaurant && (
+            <p className="text-sm text-muted-foreground">From: {reviewRestaurant}</p>
+          )}
+          <div className="flex flex-col gap-2">
+            {reviewItems.map((row, idx) => (
+              <div key={idx} className="flex gap-2">
+                <Input
+                  value={row.name}
+                  onChange={(e) => {
+                    const next = [...reviewItems];
+                    next[idx] = { ...next[idx], name: e.target.value };
+                    setReviewItems(next);
+                  }}
+                  placeholder="Item"
+                  className="flex-1"
+                />
+                <Input
+                  value={row.price}
+                  onChange={(e) => {
+                    const next = [...reviewItems];
+                    next[idx] = { ...next[idx], price: e.target.value };
+                    setReviewItems(next);
+                  }}
+                  type="number"
+                  step="0.01"
+                  className="w-20"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setReviewItems(reviewItems.filter((_, i) => i !== idx))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setReviewItems([...reviewItems, { name: "", price: "" }])}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add row
+            </Button>
+          </div>
+          {reviewTax != null && (
+            <p className="text-sm text-muted-foreground">Tax detected: ${reviewTax.toFixed(2)}</p>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReviewOpen(false)} disabled={savingReview}>
+              Cancel
+            </Button>
+            <Button onClick={saveReview} disabled={savingReview}>
+              {savingReview ? "Adding…" : "Add to bill"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
