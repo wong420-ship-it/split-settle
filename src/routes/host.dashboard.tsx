@@ -52,6 +52,8 @@ function HostDashboard() {
   const [reviewTax, setReviewTax] = useState<number | null>(null);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
