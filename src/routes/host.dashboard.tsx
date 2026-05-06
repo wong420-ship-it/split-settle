@@ -608,7 +608,7 @@ function HostDashboard() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-6 pb-12">
+      <div className="flex flex-col gap-6 pb-32">
         <header>
           <div className="flex items-center justify-between">
             <Link to="/" className="text-xs text-muted-foreground">← Back</Link>
