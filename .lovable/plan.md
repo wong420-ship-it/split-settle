@@ -1,18 +1,43 @@
 ## Goal
-Let the host snap a receipt photo with their phone camera, in addition to picking an existing image.
+Allow multiple guests to share a single item (e.g. split fries 2-ways), with the cost divided evenly among everyone who claimed it.
 
-## Current state
-The "Upload receipt" button uses a single `<input type="file" accept="image/*" capture="environment">`. On mobile browsers, `capture="environment"` is a *hint* — many browsers (especially iOS Safari) ignore it and show a chooser anyway, while others jump straight to the camera with no way to pick from the library. Either way, there's no explicit "Take photo" option.
+## Data model change
+Replace the single `claimed_by_user_id` column on `bill_items` with a many-to-many join table:
 
-## Changes (all in `src/routes/host.dashboard.tsx`)
+```text
+item_claims
+  item_id     uuid  -> bill_items.id (cascade delete)
+  user_id     uuid  -> session_users.id (cascade delete)
+  claimed_at  timestamptz default now()
+  PRIMARY KEY (item_id, user_id)
+```
 
-1. Replace the single "Upload receipt" button with a small action group:
-   - **Take photo** — opens the camera directly (uses a hidden input with `capture="environment"`).
-   - **Upload image** — opens the file picker (no `capture` attribute, so the user picks from photo library / files).
-2. Wire both buttons to two separate hidden `<input type="file" accept="image/*">` refs, both calling the existing `handleReceiptUpload` handler. No changes to OCR logic, the edge function, or the review modal.
-3. Keep the loading state ("Reading your receipt…") shared between both buttons; disable both while OCR is in flight.
-4. Layout: two equal-width buttons side by side under the manual "Add Item" form, matching existing rounded outline button style. Camera icon (lucide `Camera`) for the first, `Upload` icon kept for the second.
+RLS: same permissive "anyone can read/insert/delete" pattern already used on `bill_items` (no auth for guests). Add `item_claims` to the realtime publication.
 
-## Notes
-- Desktop browsers without a camera will still show a file chooser when "Take photo" is tapped — acceptable fallback behavior.
-- No backend, schema, or edge function changes needed.
+We will drop `claimed_by_user_id` from `bill_items` after migrating any existing rows into `item_claims`.
+
+## Claim screen behavior (`session.$code.claim.tsx`)
+- Fetch claims alongside items; group by `item_id` to know who claimed each.
+- A row shows up to N avatars/initials of claimers and a per-person price = `item.price / claimers.length`.
+- Tap behavior:
+  - If I haven't claimed it → insert `(item_id, my_user_id)` into `item_claims`.
+  - If I have claimed it → delete my row (un-claim my share).
+  - Items are NEVER locked — anyone can join an existing claim to split it.
+- Subscribe to realtime changes on both `bill_items` and `item_claims` for the session so splits update live.
+- "Your total" at the bottom = sum over my claimed items of `item.price / claimers.length`.
+
+## Summary screen (`session.$code.me.tsx`)
+- "What you ordered" lists each item I claimed with my share = `price / numClaimers`, and shows "shared with X others" when applicable.
+- Subtotal/tax/tip math uses my per-item shares (not full item price). Bill subtotal stays the sum of all item prices, so tax/tip proration still works.
+
+## Host views
+Quick audit of `host.dashboard.tsx` to update any place that reads `claimed_by_user_id` (likely just status indicators) so it reflects the claim list instead.
+
+## Out of scope
+- Uneven splits (e.g. 70/30). Even-split only for v1.
+- Auth changes — guests stay identified by localStorage `session_users.id`.
+
+## Technical notes
+- Migration: create `item_claims`, copy existing `(id, claimed_by_user_id)` rows where non-null, then `ALTER TABLE bill_items DROP COLUMN claimed_by_user_id, DROP COLUMN claimed_at`.
+- Add `ALTER PUBLICATION supabase_realtime ADD TABLE public.item_claims;`.
+- Update Supabase types are auto-regenerated.

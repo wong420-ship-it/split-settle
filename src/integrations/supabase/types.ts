@@ -16,37 +16,24 @@ export type Database = {
     Tables: {
       bill_items: {
         Row: {
-          claimed_at: string | null
-          claimed_by_user_id: string | null
           id: string
           name: string
           price: number
           session_id: string
         }
         Insert: {
-          claimed_at?: string | null
-          claimed_by_user_id?: string | null
           id?: string
           name: string
           price: number
           session_id: string
         }
         Update: {
-          claimed_at?: string | null
-          claimed_by_user_id?: string | null
           id?: string
           name?: string
           price?: number
           session_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "bill_items_claimed_by_user_id_fkey"
-            columns: ["claimed_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "session_users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "bill_items_session_id_fkey"
             columns: ["session_id"]
@@ -83,6 +70,24 @@ export type Database = {
           share_code?: string
           tax_amount?: number
           tip_percentage?: number
+        }
+        Relationships: []
+      }
+      item_claims: {
+        Row: {
+          claimed_at: string
+          item_id: string
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          item_id: string
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string
+          item_id?: string
+          user_id?: string
         }
         Relationships: []
       }

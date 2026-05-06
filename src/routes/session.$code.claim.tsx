@@ -1,13 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { getGuest } from "@/lib/guest";
-import { Check } from "lucide-react";
+import { Check, Users } from "lucide-react";
 
 type Session = { id: string; restaurant_name: string };
-type Item = { id: string; name: string; price: number; claimed_by_user_id: string | null };
+type Item = { id: string; name: string; price: number };
+type Claim = { item_id: string; user_id: string };
 type Guest = { id: string; display_name: string };
 
 export const Route = createFileRoute("/session/$code/claim")({
@@ -25,6 +26,7 @@ function Claim() {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,29 +50,61 @@ function Claim() {
       }
       setSession(s as Session);
       const [{ data: its }, { data: gs }] = await Promise.all([
-        supabase.from("bill_items").select("id, name, price, claimed_by_user_id").eq("session_id", s.id),
+        supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
         supabase.from("session_users").select("id, display_name").eq("session_id", s.id),
       ]);
       setItems((its ?? []) as Item[]);
       setGuests((gs ?? []) as Guest[]);
+      const itemIds = (its ?? []).map((i: any) => i.id);
+      if (itemIds.length) {
+        const { data: cs } = await supabase
+          .from("item_claims")
+          .select("item_id, user_id")
+          .in("item_id", itemIds);
+        setClaims((cs ?? []) as Claim[]);
+      }
       setLoading(false);
     })();
   }, [code, navigate]);
 
   useEffect(() => {
     if (!session) return;
+    const refetchItems = () =>
+      supabase
+        .from("bill_items")
+        .select("id, name, price")
+        .eq("session_id", session.id)
+        .then(({ data }) => data && setItems(data as Item[]));
+    const refetchClaims = async () => {
+      const { data: its } = await supabase
+        .from("bill_items")
+        .select("id")
+        .eq("session_id", session.id);
+      const ids = (its ?? []).map((i: any) => i.id);
+      if (!ids.length) {
+        setClaims([]);
+        return;
+      }
+      const { data: cs } = await supabase
+        .from("item_claims")
+        .select("item_id, user_id")
+        .in("item_id", ids);
+      setClaims((cs ?? []) as Claim[]);
+    };
     const channel = supabase
       .channel(`claim-${session.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bill_items", filter: `session_id=eq.${session.id}` },
         () => {
-          supabase
-            .from("bill_items")
-            .select("id, name, price, claimed_by_user_id")
-            .eq("session_id", session.id)
-            .then(({ data }) => data && setItems(data as Item[]));
+          refetchItems();
+          refetchClaims();
         },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "item_claims" },
+        () => refetchClaims(),
       )
       .on(
         "postgres_changes",
@@ -89,15 +123,27 @@ function Claim() {
     };
   }, [session]);
 
+  const claimsByItem = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of claims) {
+      const arr = m.get(c.item_id) ?? [];
+      arr.push(c.user_id);
+      m.set(c.item_id, arr);
+    }
+    return m;
+  }, [claims]);
+
   const toggle = async (item: Item) => {
     if (!meId) return;
-    const mine = item.claimed_by_user_id === meId;
-    if (item.claimed_by_user_id && !mine) return;
-    const next = mine
-      ? { claimed_by_user_id: null, claimed_at: null }
-      : { claimed_by_user_id: meId, claimed_at: new Date().toISOString() };
-    setItems((p) => p.map((i) => (i.id === item.id ? { ...i, ...next } : i)));
-    await supabase.from("bill_items").update(next).eq("id", item.id);
+    const claimers = claimsByItem.get(item.id) ?? [];
+    const mine = claimers.includes(meId);
+    if (mine) {
+      setClaims((p) => p.filter((c) => !(c.item_id === item.id && c.user_id === meId)));
+      await supabase.from("item_claims").delete().eq("item_id", item.id).eq("user_id", meId);
+    } else {
+      setClaims((p) => [...p, { item_id: item.id, user_id: meId }]);
+      await supabase.from("item_claims").insert({ item_id: item.id, user_id: meId });
+    }
   };
 
   const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
@@ -112,9 +158,11 @@ function Claim() {
     );
   }
 
-  const myTotal = items
-    .filter((i) => i.claimed_by_user_id === meId)
-    .reduce((s, i) => s + Number(i.price), 0);
+  const myTotal = items.reduce((sum, i) => {
+    const claimers = claimsByItem.get(i.id) ?? [];
+    if (!meId || !claimers.includes(meId)) return sum;
+    return sum + Number(i.price) / claimers.length;
+  }, 0);
 
   return (
     <AppShell>
@@ -122,7 +170,9 @@ function Claim() {
         <header>
           <Link to="/" className="text-xs text-muted-foreground">← Home</Link>
           <h1 className="mt-2 text-2xl font-bold">{session.restaurant_name}</h1>
-          <p className="text-sm text-muted-foreground">Tap the items you ordered.</p>
+          <p className="text-sm text-muted-foreground">
+            Tap items you ordered. Tap the same item as someone else to split it.
+          </p>
         </header>
 
         {items.length === 0 ? (
@@ -132,38 +182,55 @@ function Claim() {
         ) : (
           <ul className="flex flex-col gap-2.5">
             {items.map((item) => {
-              const mine = item.claimed_by_user_id === meId;
-              const taken = !!item.claimed_by_user_id && !mine;
+              const claimers = claimsByItem.get(item.id) ?? [];
+              const mine = !!meId && claimers.includes(meId);
+              const splitN = claimers.length;
+              const myShare = splitN > 0 ? Number(item.price) / splitN : Number(item.price);
+              const others = claimers.filter((id) => id !== meId);
               return (
                 <li key={item.id}>
                   <button
                     onClick={() => toggle(item)}
-                    disabled={taken}
                     className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition-all ${
                       mine
                         ? "border-primary bg-primary/10"
-                        : taken
-                          ? "border-border bg-muted opacity-60"
+                        : claimers.length > 0
+                          ? "border-border bg-card hover:border-primary/50"
                           : "border-border bg-card hover:border-primary/50 active:scale-[0.99]"
                     }`}
                   >
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium text-foreground">{item.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {mine ? (
+                        {mine && splitN === 1 ? (
                           <span className="inline-flex items-center gap-1 text-primary">
                             <Check className="h-3 w-3" /> Claimed by you
                           </span>
-                        ) : taken ? (
-                          `Claimed by ${guestName(item.claimed_by_user_id!)}`
+                        ) : mine && splitN > 1 ? (
+                          <span className="inline-flex items-center gap-1 text-primary">
+                            <Users className="h-3 w-3" /> Split {splitN} ways with{" "}
+                            {others.map(guestName).join(", ")}
+                          </span>
+                        ) : splitN > 0 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="h-3 w-3" /> {claimers.map(guestName).join(", ")} —
+                            tap to split
+                          </span>
                         ) : (
                           "Tap to claim"
                         )}
                       </span>
                     </div>
-                    <span className="font-mono font-semibold text-foreground">
-                      ${Number(item.price).toFixed(2)}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="font-mono font-semibold text-foreground">
+                        ${Number(item.price).toFixed(2)}
+                      </span>
+                      {splitN > 1 && (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          ${myShare.toFixed(2)} ea
+                        </span>
+                      )}
+                    </div>
                   </button>
                 </li>
               );
