@@ -89,6 +89,14 @@ function HostDashboard() {
       ]);
       setItems((its ?? []) as Item[]);
       setGuests((gs ?? []) as Guest[]);
+      const itemIds = (its ?? []).map((i: any) => i.id);
+      if (itemIds.length) {
+        const { data: cs } = await supabase
+          .from("item_claims")
+          .select("item_id, user_id")
+          .in("item_id", itemIds);
+        setClaims((cs ?? []) as Claim[]);
+      }
       setLoading(false);
     })();
   }, [code, navigate]);
