@@ -22,7 +22,7 @@ type Session = {
   share_code: string;
 };
 type Item = { id: string; name: string; price: number };
-type Guest = { id: string; display_name: string };
+type Guest = { id: string; display_name: string; paid_at: string | null };
 type Claim = { item_id: string; user_id: string };
 
 export const Route = createFileRoute("/host/dashboard")({
