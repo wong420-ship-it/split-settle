@@ -65,7 +65,7 @@ function HostDashboard() {
   const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const hostInsertRef = useRef<Promise<string | null> | null>(null);
+  const hostInsertRef = useRef<Promise<Guest | null> | null>(null);
   const [tipInput, setTipInput] = useState<string>("");
 
   // Load session + verify auth
