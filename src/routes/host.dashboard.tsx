@@ -1350,6 +1350,34 @@ function HostDashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={deleteBillOpen} onOpenChange={(open) => !deletingBill && setDeleteBillOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this bill?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const isOpen = guests.some((g) => !g.paid_at) || items.some((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+                return isOpen
+                  ? "This bill still has unpaid guests or unclaimed items. Deleting it permanently removes the bill, all items, guests, and claims. This can't be undone."
+                  : "This permanently removes the bill, all items, guests, and claims. This can't be undone.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingBill}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDeleteBill();
+              }}
+              disabled={deletingBill}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingBill ? "Deleting…" : "Delete bill"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={!!removeGuestTarget} onOpenChange={(open) => !open && setRemoveGuestTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
