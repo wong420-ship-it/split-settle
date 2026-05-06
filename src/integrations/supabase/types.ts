@@ -14,13 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bill_items: {
+        Row: {
+          claimed_at: string | null
+          claimed_by_user_id: string | null
+          id: string
+          name: string
+          price: number
+          session_id: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          id?: string
+          name: string
+          price: number
+          session_id: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          id?: string
+          name?: string
+          price?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_items_claimed_by_user_id_fkey"
+            columns: ["claimed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "session_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_sessions: {
+        Row: {
+          created_at: string
+          host_id: string
+          id: string
+          restaurant_name: string
+          share_code: string
+          tax_amount: number
+          tip_percentage: number
+        }
+        Insert: {
+          created_at?: string
+          host_id: string
+          id?: string
+          restaurant_name?: string
+          share_code?: string
+          tax_amount?: number
+          tip_percentage?: number
+        }
+        Update: {
+          created_at?: string
+          host_id?: string
+          id?: string
+          restaurant_name?: string
+          share_code?: string
+          tax_amount?: number
+          tip_percentage?: number
+        }
+        Relationships: []
+      }
+      session_users: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_users_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "bill_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_share_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
