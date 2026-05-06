@@ -91,7 +91,30 @@ function HostDashboard() {
         supabase.from("session_users").select("id, display_name, paid_at").eq("session_id", s.id),
       ]);
       setItems((its ?? []) as Item[]);
-      setGuests((gs ?? []) as Guest[]);
+      let guestList = (gs ?? []) as Guest[];
+      // Auto-add host as a guest so they can claim items.
+      const hostName =
+        (u.user.user_metadata?.full_name as string | undefined) ||
+        (u.user.user_metadata?.name as string | undefined) ||
+        u.user.email?.split("@")[0] ||
+        "Host";
+      const hostKey = `seatsolo:host-guest:${s.id}`;
+      let hostId = typeof window !== "undefined" ? localStorage.getItem(hostKey) : null;
+      const existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
+      if (!existingHost) {
+        const { data: inserted } = await supabase
+          .from("session_users")
+          .insert({ session_id: s.id, display_name: `${hostName} (host)` })
+          .select("id, display_name, paid_at")
+          .maybeSingle();
+        if (inserted) {
+          hostId = inserted.id;
+          if (typeof window !== "undefined") localStorage.setItem(hostKey, inserted.id);
+          guestList = [...guestList, inserted as Guest];
+        }
+      }
+      setHostGuestId(hostId);
+      setGuests(guestList);
       const itemIds = (its ?? []).map((i: any) => i.id);
       if (itemIds.length) {
         const { data: cs } = await supabase
