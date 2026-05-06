@@ -658,8 +658,23 @@ function HostDashboard() {
             <div className="mt-2 flex items-center gap-1">
               <Input
                 type="number"
-                value={tip}
-                onChange={(e) => updateField("tip_percentage", parseFloat(e.target.value) || 0)}
+                inputMode="decimal"
+                min={0}
+                max={MAX_TIP}
+                value={tipInput === "" ? (Number.isFinite(tip) ? String(tip) : "") : tipInput}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setTipInput(raw);
+                  if (raw === "") {
+                    updateField("tip_percentage", 0);
+                    return;
+                  }
+                  const n = parseFloat(raw);
+                  if (Number.isFinite(n) && n >= 0 && n <= MAX_TIP) {
+                    updateField("tip_percentage", n);
+                  }
+                }}
+                onBlur={() => setTipInput("")}
                 className="h-8 border-0 p-0 text-lg font-semibold focus-visible:ring-0"
               />
               <span className="text-muted-foreground">%</span>
