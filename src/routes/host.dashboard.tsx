@@ -270,6 +270,24 @@ function HostDashboard() {
               <Plus className="h-4 w-4" />
             </Button>
           </form>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleReceiptUpload}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={ocrLoading}
+            className="mt-2 h-10 w-full"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {ocrLoading ? "Reading your receipt…" : "Upload receipt"}
+          </Button>
         </section>
 
         <section className="grid grid-cols-2 gap-3">
