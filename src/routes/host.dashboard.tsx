@@ -856,27 +856,34 @@ function HostDashboard() {
               )}
             </div>
           ) : (
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => cameraInputRef.current?.click()}
-                disabled={ocrLoading}
-                className="h-10"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Take photo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={ocrLoading}
-                className="h-10"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload image
-              </Button>
+            <div className="mt-2 flex flex-col gap-2">
+              {hasScannedReceipt && (
+                <p className="text-xs text-muted-foreground">
+                  Got another receipt? Scan it to merge items into this bill.
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={ocrLoading}
+                  className="h-10"
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  {hasScannedReceipt ? "Scan another" : "Take photo"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={ocrLoading}
+                  className="h-10"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload image
+                </Button>
+              </div>
             </div>
           )}
         </section>
