@@ -547,6 +547,18 @@ function HostDashboard() {
   const total = subtotal + tax + tipAmount;
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${session.share_code}`;
 
+  // Per-guest running totals (subtotal share + proportional tax/tip).
+  const guestTotals = new Map<string, number>();
+  for (const g of guests) {
+    const sub = items.reduce((s, i) => {
+      const claimers = claimsByItem.get(i.id) ?? [];
+      if (!claimers.includes(g.id)) return s;
+      return s + Number(i.price) / claimers.length;
+    }, 0);
+    const ratio = subtotal > 0 ? sub / subtotal : 0;
+    guestTotals.set(g.id, sub + tax * ratio + tipAmount * ratio);
+  }
+
   // Host's own share, computed the same way as guests.
   const hostItems = hostGuestId
     ? items
