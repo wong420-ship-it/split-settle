@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,15 @@ function Index() {
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"host" | "join" | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSignedIn(!!session);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   // If we land back here after OAuth with a session, auto-create a bill.
   useEffect(() => {
@@ -148,6 +157,14 @@ function Index() {
           <p className="text-xs text-muted-foreground">
             You'll sign in with Google so only you can edit your bill.
           </p>
+          {signedIn && (
+            <Link
+              to="/host/history"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View your bills →
+            </Link>
+          )}
         </section>
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">

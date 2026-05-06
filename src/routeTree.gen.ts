@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
+import { Route as HostHistoryRouteImport } from './routes/host.history'
 import { Route as HostDashboardRouteImport } from './routes/host.dashboard'
 import { Route as SessionCodeMeRouteImport } from './routes/session.$code.me'
 import { Route as SessionCodeClaimRouteImport } from './routes/session.$code.claim'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const JoinCodeRoute = JoinCodeRouteImport.update({
   id: '/join/$code',
   path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HostHistoryRoute = HostHistoryRouteImport.update({
+  id: '/host/history',
+  path: '/host/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HostDashboardRoute = HostDashboardRouteImport.update({
@@ -44,6 +50,7 @@ const SessionCodeClaimRoute = SessionCodeClaimRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/host/dashboard': typeof HostDashboardRoute
+  '/host/history': typeof HostHistoryRoute
   '/join/$code': typeof JoinCodeRoute
   '/session/$code/claim': typeof SessionCodeClaimRoute
   '/session/$code/me': typeof SessionCodeMeRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/host/dashboard': typeof HostDashboardRoute
+  '/host/history': typeof HostHistoryRoute
   '/join/$code': typeof JoinCodeRoute
   '/session/$code/claim': typeof SessionCodeClaimRoute
   '/session/$code/me': typeof SessionCodeMeRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/host/dashboard': typeof HostDashboardRoute
+  '/host/history': typeof HostHistoryRoute
   '/join/$code': typeof JoinCodeRoute
   '/session/$code/claim': typeof SessionCodeClaimRoute
   '/session/$code/me': typeof SessionCodeMeRoute
@@ -68,6 +77,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/host/dashboard'
+    | '/host/history'
     | '/join/$code'
     | '/session/$code/claim'
     | '/session/$code/me'
@@ -75,6 +85,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/host/dashboard'
+    | '/host/history'
     | '/join/$code'
     | '/session/$code/claim'
     | '/session/$code/me'
@@ -82,6 +93,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/host/dashboard'
+    | '/host/history'
     | '/join/$code'
     | '/session/$code/claim'
     | '/session/$code/me'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HostDashboardRoute: typeof HostDashboardRoute
+  HostHistoryRoute: typeof HostHistoryRoute
   JoinCodeRoute: typeof JoinCodeRoute
   SessionCodeClaimRoute: typeof SessionCodeClaimRoute
   SessionCodeMeRoute: typeof SessionCodeMeRoute
@@ -109,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/join/$code'
       fullPath: '/join/$code'
       preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/host/history': {
+      id: '/host/history'
+      path: '/host/history'
+      fullPath: '/host/history'
+      preLoaderRoute: typeof HostHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/host/dashboard': {
@@ -138,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HostDashboardRoute: HostDashboardRoute,
+  HostHistoryRoute: HostHistoryRoute,
   JoinCodeRoute: JoinCodeRoute,
   SessionCodeClaimRoute: SessionCodeClaimRoute,
   SessionCodeMeRoute: SessionCodeMeRoute,
