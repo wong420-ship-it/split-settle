@@ -163,8 +163,10 @@ function HostDashboard() {
         .in("item_id", ids);
       setClaims((cs ?? []) as Claim[]);
     };
-    const channel = supabase
-      .channel(`host-${session.id}`)
+    // Subscribe per-item to keep claim updates scoped to this session.
+    const itemIds = items.map((i) => i.id);
+    const channel = supabase.channel(`host-${session.id}`);
+    channel
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bill_items", filter: `session_id=eq.${session.id}` },
@@ -177,6 +179,38 @@ function HostDashboard() {
           refetchClaims();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
+        () => {
+          supabase
+            .from("session_users")
+            .select("id, display_name, paid_at")
+            .eq("session_id", session.id)
+            .then(({ data }) => {
+              if (!data) return;
+              const next = data as Guest[];
+              setGuests((prev) => {
+                for (const g of next) {
+                  if (!g.paid_at) continue;
+                  const before = prev.find((p) => p.id === g.id);
+                  if (before && !before.paid_at) {
+                    toast.success(`${g.display_name} marked as paid`);
+                  }
+                }
+                return next;
+              });
+            });
+        },
+      );
+    for (const id of itemIds) {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "item_claims", filter: `item_id=eq.${id}` },
+        () => refetchClaims(),
+      );
+    }
+    channel.subscribe();
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
