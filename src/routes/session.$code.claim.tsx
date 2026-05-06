@@ -220,6 +220,13 @@ function Claim() {
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">No items yet — your host is adding them.</p>
+            <div className="mt-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              Listening for updates…
+            </div>
           </div>
         ) : (
           <ul className="flex flex-col gap-2.5">
