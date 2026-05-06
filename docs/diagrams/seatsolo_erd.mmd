@@ -1,0 +1,36 @@
+erDiagram
+    bill_sessions ||--o{ bill_items : "has"
+    bill_sessions ||--o{ session_users : "has"
+    bill_items ||--o{ item_claims : "claimed by"
+    session_users ||--o{ item_claims : "claims"
+
+    bill_sessions {
+        uuid id PK
+        uuid host_id
+        text restaurant_name
+        text share_code UK
+        numeric tax_amount
+        numeric tip_percentage
+        timestamptz created_at
+    }
+
+    bill_items {
+        uuid id PK
+        uuid session_id FK
+        text name
+        numeric price
+    }
+
+    session_users {
+        uuid id PK
+        uuid session_id FK
+        text display_name
+        timestamptz paid_at
+        timestamptz created_at
+    }
+
+    item_claims {
+        uuid item_id FK
+        uuid user_id FK
+        timestamptz claimed_at
+    }

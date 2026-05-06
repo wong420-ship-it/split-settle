@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph DB["Postgres"]
+        T1[("bill_items")]
+        T2[("item_claims")]
+        T3[("session_users")]
+        T4[("bill_sessions")]
+    end
+
+    WAL["Write-Ahead Log"] --> RT["Supabase Realtime<br/>postgres_changes"]
+    T1 --> WAL
+    T2 --> WAL
+    T3 --> WAL
+    T4 --> WAL
+
+    RT -->|"channel: session:CODE"| HD["Host Dashboard"]
+    RT -->|"channel: session:CODE"| GC["Guest Claim Screen"]
+    RT -->|"channel: session:CODE"| GM["Guest Me Screen"]
+
+    HD --> H1["Refresh items list<br/>+ running totals"]
+    HD --> H2["Toast: guest joined"]
+    HD --> H3["Toast: guest paid"]
+
+    GC --> G1["Live claim toggles<br/>show co-claimers"]
+    GC --> G2["New items appear<br/>(empty -> populated)"]
+
+    GM --> M1["Updated share total"]
+    GM --> M2["Paid status sync"]

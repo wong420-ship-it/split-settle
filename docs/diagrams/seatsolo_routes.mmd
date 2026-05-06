@@ -1,0 +1,16 @@
+flowchart TD
+    R0["/<br/>(landing + join code input)"]
+    R1["/host/dashboard<br/>(host: scan, edit, totals)"]
+    R2["/host/history<br/>(past bills)"]
+    R3["/join/$code<br/>(deep link → display name)"]
+    R4["/session/$code/claim<br/>(guest: claim items)"]
+    R5["/session/$code/me<br/>(guest: my share + paid)"]
+
+    R0 -->|"Sign in as host"| R1
+    R0 -->|"Enter 6-char code"| R3
+    R3 -->|"Pick name"| R4
+    R4 -->|"View summary"| R5
+    R5 -->|"Back to claiming"| R4
+    R1 -->|"View past bills"| R2
+    R2 -->|"Reopen bill"| R1
+    R1 -->|"Share link → guest opens"| R3
