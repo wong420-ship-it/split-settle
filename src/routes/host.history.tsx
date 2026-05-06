@@ -272,6 +272,34 @@ function HostHistory() {
           </ul>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !deleting && !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.session.restaurant_name || "this bill"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.status === "Open"
+                ? "This bill still has unpaid guests or unclaimed items. Deleting it permanently removes the bill, all items, guests, and claims. This can't be undone."
+                : "This permanently removes the bill, all items, guests, and claims. This can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete bill"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
