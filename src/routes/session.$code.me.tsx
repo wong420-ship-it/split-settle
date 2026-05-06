@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { getGuest } from "@/lib/guest";
+import { clearGuest, getGuest } from "@/lib/guest";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 
