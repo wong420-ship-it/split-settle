@@ -167,6 +167,9 @@ function Claim() {
 
   const toggle = async (item: Item) => {
     if (!meId) return;
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(10);
+    }
     const claimers = claimsByItem.get(item.id) ?? [];
     const mine = claimers.includes(meId);
     if (mine) {
@@ -183,8 +186,15 @@ function Claim() {
   if (loading || !session) {
     return (
       <AppShell>
-        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
-          Loading…
+        <div className="flex flex-col gap-5">
+          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+          <ul className="flex flex-col gap-2.5">
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i} className="h-16 animate-pulse rounded-2xl bg-card" />
+            ))}
+          </ul>
         </div>
       </AppShell>
     );
@@ -210,6 +220,13 @@ function Claim() {
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">No items yet — your host is adding them.</p>
+            <div className="mt-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              Listening for updates…
+            </div>
           </div>
         ) : (
           <ul className="flex flex-col gap-2.5">

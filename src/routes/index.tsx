@@ -94,9 +94,8 @@ function Index() {
     setLoading(null);
   };
 
-  const joinBill = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = code.trim().toUpperCase();
+  const tryJoin = async (raw: string) => {
+    const trimmed = raw.trim().toUpperCase();
     setCodeError(null);
     if (trimmed.length !== 6) {
       setCodeError("Codes are 6 characters.");
@@ -119,13 +118,29 @@ function Index() {
       return;
     }
     if (!data) {
-      setCodeError(`Code "${trimmed}" not found. Double-check with your host.`);
+      setCodeError(
+        `Code "${trimmed}" not found. Double-check casing and typos with your host.`,
+      );
       toast.error("Code not found");
       setLoading(null);
       return;
     }
     navigate({ to: "/join/$code", params: { code: trimmed } });
   };
+
+  const joinBill = (e: React.FormEvent) => {
+    e.preventDefault();
+    void tryJoin(code);
+  };
+
+  // Auto-submit when 6 valid alphanumeric chars are entered.
+  useEffect(() => {
+    if (loading) return;
+    if (code.length === 6 && /^[A-Z0-9]{6}$/.test(code)) {
+      void tryJoin(code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   return (
     <AppShell>
@@ -173,7 +188,8 @@ function Index() {
             <Input
               value={code}
               onChange={(e) => {
-                setCode(e.target.value.toUpperCase());
+                const cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+                setCode(cleaned);
                 if (codeError) setCodeError(null);
               }}
               placeholder="6-character code"

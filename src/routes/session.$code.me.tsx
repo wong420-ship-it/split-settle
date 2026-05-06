@@ -237,6 +237,9 @@ function Me() {
           disabled={marking || !meId}
           onClick={async () => {
             if (!meId) return;
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+              navigator.vibrate?.(15);
+            }
             setMarking(true);
             const next = paidAt ? null : new Date().toISOString();
             const prev = paidAt;

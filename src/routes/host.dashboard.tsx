@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Camera, Check, Copy, History, Loader2, Plus, Trash2, Upload, UserPlus, Users } from "lucide-react";
+import { Camera, Check, Copy, History, Loader2, Pencil, Plus, Share2, Trash2, Upload, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -16,6 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -67,6 +77,12 @@ function HostDashboard() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hostInsertRef = useRef<Promise<Guest | null> | null>(null);
   const [tipInput, setTipInput] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
 
   // Load session + verify auth
   useEffect(() => {
@@ -92,6 +108,16 @@ function HostDashboard() {
         return;
       }
       setSession(s as Session);
+      // Apply remembered tip preference if this is a fresh bill (still default 18).
+      if (typeof window !== "undefined" && Number(s.tip_percentage) === 18) {
+        const savedRaw = localStorage.getItem("seatsolo:lastTipPct");
+        const saved = savedRaw == null ? null : parseFloat(savedRaw);
+        if (saved !== null && Number.isFinite(saved) && saved !== 18 && saved >= 0 && saved <= MAX_TIP) {
+          await supabase.from("bill_sessions").update({ tip_percentage: saved }).eq("id", s.id);
+          (s as Session).tip_percentage = saved;
+          setSession({ ...(s as Session), tip_percentage: saved });
+        }
+      }
       const [{ data: its }, { data: gs }] = await Promise.all([
         supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
         supabase.from("session_users").select("id, display_name, paid_at").eq("session_id", s.id),
@@ -202,7 +228,13 @@ function HostDashboard() {
               if (!data) return;
               const next = data as Guest[];
               setGuests((prev) => {
+                const prevIds = new Set(prev.map((p) => p.id));
                 for (const g of next) {
+                  // Skip the host's own row when announcing new joiners.
+                  const isHost = / \(host\)$/.test(g.display_name);
+                  if (!prevIds.has(g.id) && !isHost && prev.length > 0) {
+                    toast(`${g.display_name} joined`);
+                  }
                   if (!g.paid_at) continue;
                   const before = prev.find((p) => p.id === g.id);
                   if (before && !before.paid_at) {
@@ -245,6 +277,9 @@ function HostDashboard() {
     if (!session) return;
     setSession({ ...session, [field]: value });
     const patch = field === "tax_amount" ? { tax_amount: value } : { tip_percentage: value };
+    if (field === "tip_percentage" && typeof window !== "undefined") {
+      localStorage.setItem("seatsolo:lastTipPct", String(value));
+    }
     await supabase.from("bill_sessions").update(patch).eq("id", session.id);
   };
 
@@ -285,6 +320,91 @@ function HostDashboard() {
         .from("item_claims")
         .insert({ item_id: itemId, user_id: userId });
       if (error) toast.error(error.message);
+    }
+  };
+
+  const startEditItem = (item: Item) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+    setEditPrice(String(item.price));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditPrice("");
+  };
+
+  const saveEdit = async (itemId: string) => {
+    const name = editName.trim().slice(0, 120);
+    const price = parseFloat(editPrice);
+    if (!name) {
+      toast.error("Name is required.");
+      return;
+    }
+    if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) {
+      toast.error("Price must be between $0.01 and $100,000.");
+      return;
+    }
+    setSavingEdit(true);
+    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, name, price } : i)));
+    const { error } = await supabase
+      .from("bill_items")
+      .update({ name, price })
+      .eq("id", itemId);
+    setSavingEdit(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    cancelEdit();
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setClaims((prev) => prev.filter((c) => c.item_id !== id));
+    // Delete dependent claims first (no FK cascade in schema).
+    await supabase.from("item_claims").delete().eq("item_id", id);
+    const { error } = await supabase.from("bill_items").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success("Item removed");
+  };
+
+  const claimAllUnclaimed = async () => {
+    if (!session || !hostGuestId) return;
+    const unclaimed = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+    if (!unclaimed.length) return;
+    const rows = unclaimed.map((i) => ({ item_id: i.id, user_id: hostGuestId }));
+    setClaims((prev) => [...prev, ...rows]);
+    const { error } = await supabase.from("item_claims").insert(rows);
+    if (error) toast.error(error.message);
+    else toast.success(`Claimed ${unclaimed.length} item${unclaimed.length === 1 ? "" : "s"}`);
+  };
+
+  const shareLink = async (link: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join my bill on Seat Solo",
+          text: `Join my bill on Seat Solo (code ${session?.share_code})`,
+          url: link,
+        });
+        return;
+      } catch (err) {
+        // User cancelled — fall through to clipboard fallback only on real errors.
+        if ((err as Error)?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn't share or copy.");
     }
   };
 
@@ -399,14 +519,32 @@ function HostDashboard() {
     }
     setSavingReview(false);
     setReviewOpen(false);
+    setHasScannedReceipt(true);
     toast.success(`Added ${inserted.length} item${inserted.length === 1 ? "" : "s"}.`);
   };
 
   if (loading || !session) {
     return (
       <AppShell>
-        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
-          Loading your bill…
+        <div className="flex flex-col gap-6">
+          <div className="space-y-2">
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+            <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="mb-3 h-3 w-12 animate-pulse rounded bg-muted" />
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded bg-muted/60" />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-20 animate-pulse rounded-2xl bg-card" />
+            <div className="h-20 animate-pulse rounded-2xl bg-card" />
+          </div>
+          <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
         </div>
       </AppShell>
     );
@@ -418,6 +556,18 @@ function HostDashboard() {
   const tipAmount = (subtotal * tip) / 100;
   const total = subtotal + tax + tipAmount;
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${session.share_code}`;
+
+  // Per-guest running totals (subtotal share + proportional tax/tip).
+  const guestTotals = new Map<string, number>();
+  for (const g of guests) {
+    const sub = items.reduce((s, i) => {
+      const claimers = claimsByItem.get(i.id) ?? [];
+      if (!claimers.includes(g.id)) return s;
+      return s + Number(i.price) / claimers.length;
+    }, 0);
+    const ratio = subtotal > 0 ? sub / subtotal : 0;
+    guestTotals.set(g.id, sub + tax * ratio + tipAmount * ratio);
+  }
 
   // Host's own share, computed the same way as guests.
   const hostItems = hostGuestId
@@ -458,7 +608,7 @@ function HostDashboard() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-6 pb-12">
+      <div className="flex flex-col gap-6 pb-32">
         <header>
           <div className="flex items-center justify-between">
             <Link to="/" className="text-xs text-muted-foreground">← Back</Link>
@@ -487,74 +637,138 @@ function HostDashboard() {
                 const claimers = claimsByItem.get(item.id) ?? [];
                 const splitN = claimers.length;
                 const claimerSet = new Set(claimers);
+                const isEditing = editingId === item.id;
                 return (
                   <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-foreground">{item.name}</span>
-                      {splitN === 0 ? (
-                        <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-primary">
-                          {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                          <span className="truncate">
-                            {claimers.map(guestName).join(", ")}
-                            {splitN > 1 && ` · split ${splitN} ways`}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex flex-col items-end">
-                        <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
-                        {splitN > 1 && (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            ${(Number(item.price) / splitN).toFixed(2)} ea
-                          </span>
-                        )}
-                      </div>
-                      <Popover>
-                        <PopoverTrigger asChild>
+                    {isEditing ? (
+                      <div className="flex w-full flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Item name"
+                            className="h-9 flex-1"
+                            autoFocus
+                          />
+                          <Input
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(e.target.value)}
+                            placeholder="0.00"
+                            type="number"
+                            step="0.01"
+                            className="h-9 w-20"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={guests.length === 0}
-                            aria-label="Assign item"
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
                           >
-                            <UserPlus className="h-3.5 w-3.5" />
+                            Cancel
                           </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-56 p-2">
-                          <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Assign to
-                          </div>
-                          {guests.length === 0 ? (
-                            <p className="px-2 py-1 text-xs text-muted-foreground">No one's joined yet.</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => saveEdit(item.id)}
+                            disabled={savingEdit}
+                          >
+                            {savingEdit ? "Saving…" : "Save"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="text-foreground">{item.name}</span>
+                          {splitN === 0 ? (
+                            <span className={`text-xs ${allGuestsPaid ? "text-destructive font-medium" : "text-muted-foreground"}`}>Unclaimed</span>
                           ) : (
-                            <ul className="flex flex-col">
-                              {guests.map((g) => {
-                                const checked = claimerSet.has(g.id);
-                                return (
-                                  <li key={g.id}>
-                                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary">
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={() => toggleClaim(item.id, g.id, checked)}
-                                      />
-                                      <span className="flex-1 truncate">
-                                        {g.display_name}
-                                        {g.id === hostGuestId && " (you)"}
-                                      </span>
-                                    </label>
-                                  </li>
-                                );
-                              })}
-                            </ul>
+                            <span className="inline-flex items-center gap-1 text-xs text-primary">
+                              {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                              <span className="truncate">
+                                {claimers.map(guestName).join(", ")}
+                                {splitN > 1 && ` · split ${splitN} ways`}
+                              </span>
+                            </span>
                           )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex flex-col items-end">
+                            <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
+                            {splitN > 1 && (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                ${(Number(item.price) / splitN).toFixed(2)} ea
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
+                            onClick={() => startEditItem(item)}
+                            aria-label="Edit item"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={guests.length === 0}
+                                aria-label="Assign item"
+                              >
+                                <UserPlus className="h-3.5 w-3.5" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-2">
+                              <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Assign to
+                              </div>
+                              {guests.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-muted-foreground">No one's joined yet.</p>
+                              ) : (
+                                <ul className="flex flex-col">
+                                  {guests.map((g) => {
+                                    const checked = claimerSet.has(g.id);
+                                    return (
+                                      <li key={g.id}>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary">
+                                          <Checkbox
+                                            checked={checked}
+                                            onCheckedChange={() => toggleClaim(item.id, g.id, checked)}
+                                          />
+                                          <span className="flex-1 truncate">
+                                            {g.display_name}
+                                            {g.id === hostGuestId && " (you)"}
+                                          </span>
+                                        </label>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteId(item.id)}
+                            aria-label="Delete item"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </li>
                 );
               })}
@@ -642,27 +856,34 @@ function HostDashboard() {
               )}
             </div>
           ) : (
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => cameraInputRef.current?.click()}
-                disabled={ocrLoading}
-                className="h-10"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Take photo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={ocrLoading}
-                className="h-10"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload image
-              </Button>
+            <div className="mt-2 flex flex-col gap-2">
+              {hasScannedReceipt && (
+                <p className="text-xs text-muted-foreground">
+                  Got another receipt? Scan it to merge items into this bill.
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={ocrLoading}
+                  className="h-10"
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  {hasScannedReceipt ? "Scan another" : "Take photo"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={ocrLoading}
+                  className="h-10"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload image
+                </Button>
+              </div>
             </div>
           )}
         </section>
@@ -722,7 +943,7 @@ function HostDashboard() {
 
         {hostGuestId && (
           <section
-            className={`flex flex-col gap-3 rounded-2xl p-5 ${
+            className={`sticky bottom-2 z-10 flex flex-col gap-3 rounded-2xl p-5 shadow-lg ${
               hostPaidAt
                 ? "bg-secondary text-secondary-foreground"
                 : "bg-primary text-primary-foreground"
@@ -764,7 +985,16 @@ function HostDashboard() {
         <section className="flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-accent p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-accent-foreground">Share with your table</div>
           <div className="text-2xl font-bold tracking-[0.3em] text-foreground">{session.share_code}</div>
+          <Button
+            type="button"
+            size="lg"
+            className="h-11 w-full"
+            onClick={() => void shareLink(link)}
+          >
+            <Share2 className="mr-2 h-4 w-4" /> Share link
+          </Button>
           <button
+            type="button"
             onClick={() => {
               navigator.clipboard?.writeText(link);
               setCopied(true);
@@ -824,13 +1054,24 @@ function HostDashboard() {
                 </p>
               )}
               {paidButUnclaimed && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-2">
                   <p className="text-xs text-destructive">
                     {unclaimedItems.map((i) => i.name).join(", ")} · ${unclaimedTotal.toFixed(2)} not covered
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Claim them yourself or assign to a guest before closing out.
                   </p>
+                  {hostGuestId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={claimAllUnclaimed}
+                    >
+                      Claim leftovers
+                    </Button>
+                  )}
                 </div>
               )}
             </section>
@@ -864,6 +1105,9 @@ function HostDashboard() {
                     {g.paid_at ? <Check className="h-3.5 w-3.5" /> : g.display_name[0]?.toUpperCase()}
                   </span>
                   <span>{g.display_name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    ${(guestTotals.get(g.id) ?? 0).toFixed(2)}
+                  </span>
                   {g.paid_at && (
                     <span className="text-xs font-normal text-primary">paid</span>
                   )}
@@ -1005,6 +1249,21 @@ function HostDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the item and any claims on it. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteItem}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
