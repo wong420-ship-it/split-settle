@@ -152,20 +152,32 @@ function Index() {
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Got a code?</h2>
-          <form onSubmit={joinBill} className="flex flex-col gap-3">
+          <form onSubmit={joinBill} className="flex flex-col gap-2" noValidate>
             <Input
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setCode(e.target.value.toUpperCase());
+                if (codeError) setCodeError(null);
+              }}
               placeholder="6-character code"
               maxLength={6}
-              className="h-12 text-center text-lg font-mono tracking-[0.4em] uppercase"
+              aria-invalid={codeError ? true : undefined}
+              aria-describedby={codeError ? "join-code-error" : undefined}
+              className={`h-12 text-center text-lg font-mono tracking-[0.4em] uppercase ${
+                codeError ? "border-destructive focus-visible:ring-destructive" : ""
+              }`}
             />
+            {codeError && (
+              <p id="join-code-error" className="text-sm text-destructive">
+                {codeError}
+              </p>
+            )}
             <Button
               type="submit"
               variant="secondary"
               size="lg"
-              className="h-12 w-full text-base"
-              disabled={code.trim().length < 4 || loading !== null}
+              className="mt-1 h-12 w-full text-base"
+              disabled={code.trim().length === 0 || loading !== null}
             >
               {loading === "join" ? "Joining…" : "Join a Bill"}
             </Button>
