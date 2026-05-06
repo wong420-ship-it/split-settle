@@ -89,7 +89,22 @@ export type Database = {
           item_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "item_claims_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "bill_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_claims_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "session_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       session_users: {
         Row: {

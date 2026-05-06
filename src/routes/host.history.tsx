@@ -4,6 +4,23 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { MoreVertical, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type SessionRow = {
   id: string;
@@ -52,6 +69,26 @@ function HostHistory() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Summary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.session.id;
+    setDeleting(true);
+    const { error } = await supabase.from("bill_sessions").delete().eq("id", id);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(`seatsolo:host-guest:${id}`);
+    }
+    setSummaries((prev) => prev.filter((s) => s.session.id !== id));
+    setDeleteTarget(null);
+    toast.success("Bill deleted");
+  };
 
   useEffect(() => {
     (async () => {
@@ -173,12 +210,13 @@ function HostHistory() {
                 blockers.push(`${unpaidCount} unpaid`);
               if (unclaimedCount > 0)
                 blockers.push(`${unclaimedCount} unclaimed`);
+              const summary = { session: s, total, guestCount, unpaidCount, unclaimedCount, status };
               return (
-                <li key={s.id}>
+                <li key={s.id} className="relative">
                   <Link
                     to="/host/dashboard"
                     search={{ code: s.share_code }}
-                    className="block rounded-2xl border border-border bg-card p-4 transition hover:border-primary/50"
+                    className="block rounded-2xl border border-border bg-card p-4 pr-12 transition hover:border-primary/50"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -203,12 +241,65 @@ function HostHistory() {
                       </span>
                     </div>
                   </Link>
+                  <div className="absolute right-2 top-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Bill options"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setDeleteTarget(summary);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete bill
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !deleting && !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.session.restaurant_name || "this bill"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.status === "Open"
+                ? "This bill still has unpaid guests or unclaimed items. Deleting it permanently removes the bill, all items, guests, and claims. This can't be undone."
+                : "This permanently removes the bill, all items, guests, and claims. This can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete bill"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
