@@ -96,18 +96,21 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          paid_at: string | null
           session_id: string
         }
         Insert: {
           created_at?: string
           display_name: string
           id?: string
+          paid_at?: string | null
           session_id: string
         }
         Update: {
           created_at?: string
           display_name?: string
           id?: string
+          paid_at?: string | null
           session_id?: string
         }
         Relationships: [
