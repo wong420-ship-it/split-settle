@@ -52,6 +52,7 @@ function HostDashboard() {
   const [reviewTax, setReviewTax] = useState<number | null>(null);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load session + verify auth
