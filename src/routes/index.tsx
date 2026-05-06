@@ -42,6 +42,15 @@ function Index() {
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"host" | "join" | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSignedIn(!!session);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   // If we land back here after OAuth with a session, auto-create a bill.
   useEffect(() => {
