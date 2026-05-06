@@ -108,6 +108,7 @@ function HostDashboard() {
       let hostId = typeof window !== "undefined" ? localStorage.getItem(hostKey) : null;
       const existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
       if (!existingHost) {
+        // StrictMode-safe: dedupe concurrent inserts via a ref-stored promise.
         if (!hostInsertRef.current) {
           hostInsertRef.current = (async () => {
             const { data: inserted } = await supabase
@@ -115,15 +116,19 @@ function HostDashboard() {
               .insert({ session_id: s.id, display_name: `${hostName} (host)` })
               .select("id, display_name, paid_at")
               .maybeSingle();
-            if (inserted) {
-              if (typeof window !== "undefined") localStorage.setItem(hostKey, inserted.id);
-              guestList = [...guestList, inserted as Guest];
-              return inserted.id;
+            if (inserted && typeof window !== "undefined") {
+              localStorage.setItem(hostKey, inserted.id);
             }
-            return null;
+            return inserted as Guest | null;
           })();
         }
-        hostId = await hostInsertRef.current;
+        const inserted = await hostInsertRef.current;
+        if (inserted) {
+          hostId = inserted.id;
+          if (!guestList.find((g) => g.id === inserted.id)) {
+            guestList = [...guestList, inserted];
+          }
+        }
       }
       setHostGuestId(hostId);
       setGuests(guestList);
