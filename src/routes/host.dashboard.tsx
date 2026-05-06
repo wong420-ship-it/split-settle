@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
@@ -52,7 +52,7 @@ function HostDashboard() {
   const [reviewTax, setReviewTax] = useState<number | null>(null);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
-  const fileInputRef = useState<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load session + verify auth
   useEffect(() => {
