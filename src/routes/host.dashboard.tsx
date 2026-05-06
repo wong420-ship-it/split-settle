@@ -21,7 +21,7 @@ type Session = {
   tip_percentage: number;
   share_code: string;
 };
-type Item = { id: string; name: string; price: number; claimed_by_user_id: string | null };
+type Item = { id: string; name: string; price: number };
 type Guest = { id: string; display_name: string };
 
 export const Route = createFileRoute("/host/dashboard")({
@@ -82,7 +82,7 @@ function HostDashboard() {
       }
       setSession(s as Session);
       const [{ data: its }, { data: gs }] = await Promise.all([
-        supabase.from("bill_items").select("id, name, price, claimed_by_user_id").eq("session_id", s.id),
+        supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
         supabase.from("session_users").select("id, display_name").eq("session_id", s.id),
       ]);
       setItems((its ?? []) as Item[]);
@@ -102,7 +102,7 @@ function HostDashboard() {
         () => {
           supabase
             .from("bill_items")
-            .select("id, name, price, claimed_by_user_id")
+            .select("id, name, price")
             .eq("session_id", session.id)
             .then(({ data }) => data && setItems(data as Item[]));
         },

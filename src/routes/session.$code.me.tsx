@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getGuest } from "@/lib/guest";
 
 type Session = { id: string; restaurant_name: string; tax_amount: number; tip_percentage: number };
-type Item = { id: string; name: string; price: number; claimed_by_user_id: string | null };
+type Item = { id: string; name: string; price: number };
+type Claim = { item_id: string; user_id: string };
 
 export const Route = createFileRoute("/session/$code/me")({
   head: () => ({
@@ -23,6 +24,7 @@ function Me() {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,9 +48,17 @@ function Me() {
       setSession(s as Session);
       const { data: its } = await supabase
         .from("bill_items")
-        .select("id, name, price, claimed_by_user_id")
+        .select("id, name, price")
         .eq("session_id", s.id);
-      setItems((its ?? []) as Item[]);
+      const itemList = (its ?? []) as Item[];
+      setItems(itemList);
+      if (itemList.length) {
+        const { data: cs } = await supabase
+          .from("item_claims")
+          .select("item_id, user_id")
+          .in("item_id", itemList.map((i) => i.id));
+        setClaims((cs ?? []) as Claim[]);
+      }
       setLoading(false);
     })();
   }, [code, navigate]);
@@ -63,8 +73,17 @@ function Me() {
     );
   }
 
-  const myItems = items.filter((i) => i.claimed_by_user_id === meId);
-  const subtotal = myItems.reduce((s, i) => s + Number(i.price), 0);
+  const claimerCount = (itemId: string) => claims.filter((c) => c.item_id === itemId).length;
+  const iClaimed = (itemId: string) => !!meId && claims.some((c) => c.item_id === itemId && c.user_id === meId);
+
+  const myItems = items
+    .filter((i) => iClaimed(i.id))
+    .map((i) => {
+      const n = claimerCount(i.id) || 1;
+      return { ...i, share: Number(i.price) / n, splitN: n };
+    });
+
+  const subtotal = myItems.reduce((s, i) => s + i.share, 0);
   const billSubtotal = items.reduce((s, i) => s + Number(i.price), 0);
   const share = billSubtotal > 0 ? subtotal / billSubtotal : 0;
   const myTax = Number(session.tax_amount) * share;
@@ -92,8 +111,15 @@ function Me() {
             <ul className="divide-y divide-border">
               {myItems.map((item) => (
                 <li key={item.id} className="flex justify-between py-2.5 text-sm">
-                  <span>{item.name}</span>
-                  <span className="font-mono">${Number(item.price).toFixed(2)}</span>
+                  <div className="flex flex-col">
+                    <span>{item.name}</span>
+                    {item.splitN > 1 && (
+                      <span className="text-xs text-muted-foreground">
+                        Split {item.splitN} ways (${Number(item.price).toFixed(2)} total)
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-mono">${item.share.toFixed(2)}</span>
                 </li>
               ))}
             </ul>
