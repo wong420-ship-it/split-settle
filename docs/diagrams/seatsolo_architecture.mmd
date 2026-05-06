@@ -1,0 +1,32 @@
+graph TB
+    subgraph Client["Client (Browser / PWA)"]
+        UI["React 19 UI<br/>TanStack Router"]
+        RT["Realtime subscriptions"]
+    end
+
+    subgraph Edge["Cloudflare Workers (SSR)"]
+        SSR["TanStack Start<br/>Vite build"]
+        SF["Server functions<br/>src/server/*.functions.ts"]
+    end
+
+    subgraph Cloud["Lovable Cloud (Supabase)"]
+        AUTH["Auth<br/>(host accounts)"]
+        DB[("Postgres<br/>+ RLS")]
+        REALTIME["Realtime<br/>postgres_changes"]
+        STORAGE["Storage<br/>receipt images"]
+        EF["Edge function<br/>parse-receipt"]
+    end
+
+    AI["Lovable AI Gateway<br/>google/gemini-2.5-flash"]
+
+    UI --> SSR
+    UI -->|supabase-js| AUTH
+    UI -->|supabase-js| DB
+    UI -->|upload| STORAGE
+    UI -->|invoke| EF
+    RT <-->|websocket| REALTIME
+    REALTIME <-->|WAL| DB
+    SSR --> SF
+    SF --> DB
+    EF -->|vision prompt| AI
+    EF --> DB

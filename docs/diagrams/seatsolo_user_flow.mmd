@@ -1,0 +1,21 @@
+flowchart TD
+    Start(["Open SeatSolo"]) --> Choice{"Host or Guest?"}
+
+    Choice -->|Host| H1["Sign in"]
+    H1 --> H2["Create bill session<br/>(share_code generated)"]
+    H2 --> H3["Scan / upload receipt"]
+    H3 --> H4["OCR review<br/>edit items, tax, fees"]
+    H4 --> H5["Publish to dashboard"]
+    H5 --> Live{{"Live session"}}
+
+    Choice -->|Guest| G1["Enter 6-char code<br/>or open join link"]
+    G1 --> G2["Pick display name"]
+    G2 --> Live
+
+    Live --> C1["Claim items<br/>(toggle, multi-claimer split)"]
+    C1 --> C2["View 'Me' summary<br/>subtotal + tax + tip share"]
+    C2 --> C3["Mark as paid"]
+
+    Live --> HD["Host dashboard<br/>running totals, leftovers"]
+    HD --> HE["Edit / delete items"]
+    HD --> HS["Share link / native share"]

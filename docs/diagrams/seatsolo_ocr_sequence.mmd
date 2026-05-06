@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    actor Host
+    participant UI as Host Dashboard
+    participant EF as parse-receipt<br/>(edge function)
+    participant AI as Lovable AI Gateway<br/>(Gemini 2.5 Flash)
+    participant DB as Postgres
+
+    Host->>UI: Select receipt image
+    UI->>UI: Show progress bar
+    UI->>EF: POST multipart/form-data
+    EF->>EF: Read file, base64 encode
+    EF->>AI: chat/completions<br/>(vision + JSON schema prompt)
+    AI-->>EF: JSON: items, fees, tax, total, restaurant
+    EF-->>UI: Parsed structured data
+    UI->>Host: Review screen<br/>(edit items / tax / tip)
+    Host->>UI: Confirm publish
+    UI->>DB: insert bill_items[]
+    UI->>DB: update bill_sessions<br/>(restaurant, tax)
+    DB-->>UI: ok
+    UI->>Host: Live dashboard
