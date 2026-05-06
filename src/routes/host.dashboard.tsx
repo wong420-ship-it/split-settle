@@ -295,6 +295,7 @@ function HostDashboard() {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview);
     setPendingFile(file);
     setPendingPreview(URL.createObjectURL(file));
+    void processReceipt(file);
   };
 
   const clearPending = () => {
