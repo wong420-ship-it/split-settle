@@ -240,10 +240,16 @@ function HostDashboard() {
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session || !newName.trim() || !newPrice) return;
+    const price = parseFloat(newPrice);
+    if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) {
+      toast.error("Price must be between $0.01 and $100,000.");
+      return;
+    }
+    const name = newName.trim().slice(0, 120);
     setAdding(true);
     const { error } = await supabase
       .from("bill_items")
-      .insert({ session_id: session.id, name: newName.trim(), price: parseFloat(newPrice) });
+      .insert({ session_id: session.id, name, price });
     if (error) toast.error(error.message);
     setNewName("");
     setNewPrice("");
