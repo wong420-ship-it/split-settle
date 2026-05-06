@@ -365,6 +365,43 @@ function HostDashboard() {
   const total = subtotal + tax + tipAmount;
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${session.share_code}`;
 
+  // Host's own share, computed the same way as guests.
+  const hostItems = hostGuestId
+    ? items
+        .filter((i) => (claimsByItem.get(i.id) ?? []).includes(hostGuestId))
+        .map((i) => {
+          const n = (claimsByItem.get(i.id) ?? []).length || 1;
+          return { ...i, share: Number(i.price) / n, splitN: n };
+        })
+    : [];
+  const hostSubtotal = hostItems.reduce((s, i) => s + i.share, 0);
+  const hostShareRatio = subtotal > 0 ? hostSubtotal / subtotal : 0;
+  const hostTax = tax * hostShareRatio;
+  const hostTip = tipAmount * hostShareRatio;
+  const hostTotal = hostSubtotal + hostTax + hostTip;
+  const hostGuest = guests.find((g) => g.id === hostGuestId) ?? null;
+  const hostPaidAt = hostGuest?.paid_at ?? null;
+
+  const toggleHostPaid = async () => {
+    if (!hostGuestId) return;
+    const next = hostPaidAt ? null : new Date().toISOString();
+    setGuests((prev) =>
+      prev.map((g) => (g.id === hostGuestId ? { ...g, paid_at: next } : g)),
+    );
+    const { error } = await supabase
+      .from("session_users")
+      .update({ paid_at: next })
+      .eq("id", hostGuestId);
+    if (error) {
+      toast.error(`Couldn't update: ${error.message}`);
+      setGuests((prev) =>
+        prev.map((g) => (g.id === hostGuestId ? { ...g, paid_at: hostPaidAt } : g)),
+      );
+      return;
+    }
+    toast.success(next ? "Marked as paid" : "Marked unpaid");
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col gap-6 pb-12">
