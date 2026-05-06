@@ -82,6 +82,7 @@ function HostDashboard() {
   const [editPrice, setEditPrice] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [removeGuestTarget, setRemoveGuestTarget] = useState<Guest | null>(null);
   const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
 
   // Load session + verify auth
