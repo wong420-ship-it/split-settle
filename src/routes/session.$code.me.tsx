@@ -64,6 +64,12 @@ function Me() {
           .in("item_id", itemList.map((i) => i.id));
         setClaims((cs ?? []) as Claim[]);
       }
+      const { data: meRow } = await supabase
+        .from("session_users")
+        .select("paid_at")
+        .eq("id", guest.id)
+        .maybeSingle();
+      setPaidAt((meRow as { paid_at: string | null } | null)?.paid_at ?? null);
       setLoading(false);
     })();
   }, [code, navigate]);
