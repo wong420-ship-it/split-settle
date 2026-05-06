@@ -67,6 +67,12 @@ function HostDashboard() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hostInsertRef = useRef<Promise<Guest | null> | null>(null);
   const [tipInput, setTipInput] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
 
   // Load session + verify auth
   useEffect(() => {
