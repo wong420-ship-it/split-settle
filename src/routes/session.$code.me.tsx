@@ -28,6 +28,7 @@ function Me() {
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
