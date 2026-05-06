@@ -294,39 +294,75 @@ function HostDashboard() {
             accept="image/*"
             capture="environment"
             className="hidden"
-            onChange={handleReceiptUpload}
+            onChange={handleReceiptSelect}
           />
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handleReceiptUpload}
+            onChange={handleReceiptSelect}
           />
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={ocrLoading}
-              className="h-10"
-            >
-              <Camera className="mr-2 h-4 w-4" />
-              Take photo
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={ocrLoading}
-              className="h-10"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload image
-            </Button>
-          </div>
-          {ocrLoading && (
-            <p className="mt-2 text-center text-xs text-muted-foreground">Reading your receipt…</p>
+          {pendingPreview ? (
+            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-secondary/40 p-3">
+              <div className="flex gap-3">
+                <img
+                  src={pendingPreview}
+                  alt="Receipt preview"
+                  className="h-24 w-24 shrink-0 rounded-md border border-border object-cover"
+                />
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {pendingFile?.name || "Receipt"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Ready to scan. Review the image, then read items.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={clearPending}
+                  disabled={ocrLoading}
+                  className="h-10 flex-1"
+                >
+                  Remove
+                </Button>
+                <Button
+                  type="button"
+                  onClick={processReceipt}
+                  disabled={ocrLoading}
+                  className="h-10 flex-1"
+                >
+                  {ocrLoading ? "Reading…" : "Read items"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={ocrLoading}
+                className="h-10"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Take photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={ocrLoading}
+                className="h-10"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload image
+              </Button>
+            </div>
           )}
         </section>
 
