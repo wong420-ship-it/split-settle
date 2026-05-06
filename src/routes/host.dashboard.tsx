@@ -968,7 +968,16 @@ function HostDashboard() {
         <section className="flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-accent p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-accent-foreground">Share with your table</div>
           <div className="text-2xl font-bold tracking-[0.3em] text-foreground">{session.share_code}</div>
+          <Button
+            type="button"
+            size="lg"
+            className="h-11 w-full"
+            onClick={() => void shareLink(link)}
+          >
+            <Share2 className="mr-2 h-4 w-4" /> Share link
+          </Button>
           <button
+            type="button"
             onClick={() => {
               navigator.clipboard?.writeText(link);
               setCopied(true);
