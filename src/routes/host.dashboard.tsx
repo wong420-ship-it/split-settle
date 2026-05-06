@@ -404,6 +404,26 @@ function HostDashboard() {
     else toast.success(`Removed ${g.display_name}`);
   };
 
+  const confirmDeleteBill = async () => {
+    if (!session) return;
+    setDeletingBill(true);
+    const { error } = await supabase
+      .from("bill_sessions")
+      .delete()
+      .eq("id", session.id);
+    setDeletingBill(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(`seatsolo:host-guest:${session.id}`);
+    }
+    setDeleteBillOpen(false);
+    toast.success("Bill deleted");
+    navigate({ to: "/host/history" });
+  };
+
   const claimAllUnclaimed = async () => {
     if (!session || !hostGuestId) return;
     const unclaimed = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
