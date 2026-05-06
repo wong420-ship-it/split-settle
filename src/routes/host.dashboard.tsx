@@ -104,6 +104,22 @@ function HostDashboard() {
   // Realtime
   useEffect(() => {
     if (!session) return;
+    const refetchClaims = async () => {
+      const { data: its } = await supabase
+        .from("bill_items")
+        .select("id")
+        .eq("session_id", session.id);
+      const ids = (its ?? []).map((i: any) => i.id);
+      if (!ids.length) {
+        setClaims([]);
+        return;
+      }
+      const { data: cs } = await supabase
+        .from("item_claims")
+        .select("item_id, user_id")
+        .in("item_id", ids);
+      setClaims((cs ?? []) as Claim[]);
+    };
     const channel = supabase
       .channel(`host-${session.id}`)
       .on(
@@ -115,6 +131,7 @@ function HostDashboard() {
             .select("id, name, price")
             .eq("session_id", session.id)
             .then(({ data }) => data && setItems(data as Item[]));
+          refetchClaims();
         },
       )
       .on(
@@ -128,11 +145,28 @@ function HostDashboard() {
             .then(({ data }) => data && setGuests(data as Guest[]));
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "item_claims" },
+        () => refetchClaims(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [session]);
+
+  const claimsByItem = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of claims) {
+      const arr = m.get(c.item_id) ?? [];
+      arr.push(c.user_id);
+      m.set(c.item_id, arr);
+    }
+    return m;
+  }, [claims]);
+
+  const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
 
   const updateField = async (field: "tax_amount" | "tip_percentage", value: number) => {
     if (!session) return;
