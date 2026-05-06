@@ -340,8 +340,14 @@ function HostDashboard() {
       const fresh = (inserted as Item[]).filter((i) => !ids.has(i.id));
       return [...prev, ...fresh];
     });
+    const feesTotal = reviewFees.reduce((s, f) => {
+      const n = parseFloat(f.amount);
+      return Number.isFinite(n) && n > 0 ? s + n : s;
+    }, 0);
     const patch: { tax_amount?: number; restaurant_name?: string } = {};
-    if (reviewTax != null) patch.tax_amount = reviewTax;
+    if (reviewTax != null || feesTotal > 0) {
+      patch.tax_amount = (reviewTax ?? 0) + feesTotal;
+    }
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
       patch.restaurant_name = reviewRestaurant;
     }
