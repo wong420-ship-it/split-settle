@@ -45,6 +45,7 @@ function HostDashboard() {
   const [items, setItems] = useState<Item[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [hostGuestId, setHostGuestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [newName, setNewName] = useState("");
