@@ -483,9 +483,15 @@ function HostDashboard() {
       const fd = new FormData();
       fd.append("document", file);
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.access_token) {
+        toast.error("Please sign in again to scan receipts.");
+        setOcrLoading(false);
+        return;
+      }
       const resp = await fetch(url, {
         method: "POST",
-        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
         body: fd,
       });
       const json = await resp.json();
