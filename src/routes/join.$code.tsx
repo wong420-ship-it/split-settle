@@ -31,7 +31,8 @@ function Join() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const trimmed = name.trim().slice(0, 40);
+    if (!trimmed) return;
     setLoading(true);
     const { data: s, error: se } = await supabase
       .from("bill_sessions")
@@ -45,7 +46,7 @@ function Join() {
     }
     const { data: u, error } = await supabase
       .from("session_users")
-      .insert({ session_id: s.id, display_name: name.trim() })
+      .insert({ session_id: s.id, display_name: trimmed })
       .select("id, display_name")
       .single();
     if (error || !u) {
