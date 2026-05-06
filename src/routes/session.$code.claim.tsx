@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { getGuest } from "@/lib/guest";
+import { clearGuest, getGuest } from "@/lib/guest";
 import { Check, Users } from "lucide-react";
 
 type Session = { id: string; restaurant_name: string };
