@@ -30,6 +30,9 @@ function Me() {
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [paidAt, setPaidAt] = useState<string | null>(null);
+  const [marking, setMarking] = useState(false);
+
   useEffect(() => {
     const guest = getGuest(code);
     if (!guest) {
