@@ -51,10 +51,18 @@ function Me() {
         return;
       }
       setSession(s as Session);
+      setLoading(false);
+    })();
+  }, [code, navigate]);
+
+  // Realtime + focus sync so items/claims/paid status stay fresh.
+  useEffect(() => {
+    if (!session || !meId) return;
+    const refetchAll = async () => {
       const { data: its } = await supabase
         .from("bill_items")
         .select("id, name, price")
-        .eq("session_id", s.id);
+        .eq("session_id", session.id);
       const itemList = (its ?? []) as Item[];
       setItems(itemList);
       if (itemList.length) {
@@ -63,16 +71,51 @@ function Me() {
           .select("item_id, user_id")
           .in("item_id", itemList.map((i) => i.id));
         setClaims((cs ?? []) as Claim[]);
+      } else {
+        setClaims([]);
       }
       const { data: meRow } = await supabase
         .from("session_users")
         .select("paid_at")
-        .eq("id", guest.id)
+        .eq("id", meId)
         .maybeSingle();
       setPaidAt((meRow as { paid_at: string | null } | null)?.paid_at ?? null);
-      setLoading(false);
-    })();
-  }, [code, navigate]);
+    };
+    refetchAll();
+    const channel = supabase
+      .channel(`me-${session.id}-${meId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bill_items", filter: `session_id=eq.${session.id}` },
+        () => refetchAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "item_claims" },
+        () => refetchAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "session_users", filter: `id=eq.${meId}` },
+        () => refetchAll(),
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") refetchAll();
+      });
+    const onFocus = () => refetchAll();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refetchAll();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    const poll = window.setInterval(refetchAll, 15000);
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(poll);
+    };
+  }, [session, meId]);
 
   if (loading || !session) {
     return (
@@ -172,7 +215,7 @@ function Me() {
           variant={paidAt ? "outline" : "default"}
           size="lg"
           className="h-12"
-          disabled={marking || !meId || myItems.length === 0}
+          disabled={marking || !meId}
           onClick={async () => {
             if (!meId) return;
             setMarking(true);
@@ -186,7 +229,7 @@ function Me() {
             setMarking(false);
             if (error) {
               setPaidAt(prev);
-              toast.error("Couldn't update — try again.");
+              toast.error(`Couldn't update: ${error.message}`);
               return;
             }
             toast.success(next ? "Marked as paid" : "Marked unpaid");
