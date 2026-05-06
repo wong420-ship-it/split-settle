@@ -706,15 +706,28 @@ function HostDashboard() {
           const paidCount = guests.filter((g) => g.paid_at).length;
           const allPaid = paidCount === guests.length;
           const pct = Math.round((paidCount / guests.length) * 100);
+          const unclaimedItems = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+          const unclaimedTotal = unclaimedItems.reduce((s, i) => s + Number(i.price), 0);
+          const hasUnclaimed = unclaimedItems.length > 0;
+          const paidButUnclaimed = allPaid && hasUnclaimed;
+          const fullyDone = allPaid && !hasUnclaimed;
           return (
             <section
               className={`rounded-2xl border p-4 ${
-                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+                paidButUnclaimed
+                  ? "border-destructive bg-destructive/10"
+                  : fullyDone
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card"
               }`}
             >
               <div className="flex items-center justify-between text-sm font-semibold">
-                <span className="text-foreground">
-                  {allPaid ? "Everyone has paid 🎉" : "Payments"}
+                <span className={paidButUnclaimed ? "text-destructive" : "text-foreground"}>
+                  {paidButUnclaimed
+                    ? "Paid — but items are unclaimed"
+                    : fullyDone
+                    ? "Everyone has paid 🎉"
+                    : "Payments"}
                 </span>
                 <span className="font-mono text-foreground">
                   {paidCount} / {guests.length}
@@ -722,7 +735,7 @@ function HostDashboard() {
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
                 <div
-                  className="h-full bg-primary transition-all"
+                  className={`h-full transition-all ${paidButUnclaimed ? "bg-destructive" : "bg-primary"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -734,6 +747,16 @@ function HostDashboard() {
                     .map((g) => g.display_name)
                     .join(", ")}
                 </p>
+              )}
+              {paidButUnclaimed && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-destructive">
+                    {unclaimedItems.map((i) => i.name).join(", ")} · ${unclaimedTotal.toFixed(2)} not covered
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Claim them yourself or assign to a guest before closing out.
+                  </p>
+                </div>
               )}
             </section>
           );
