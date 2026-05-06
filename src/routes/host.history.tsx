@@ -69,6 +69,26 @@ function HostHistory() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Summary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.session.id;
+    setDeleting(true);
+    const { error } = await supabase.from("bill_sessions").delete().eq("id", id);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(`seatsolo:host-guest:${id}`);
+    }
+    setSummaries((prev) => prev.filter((s) => s.session.id !== id));
+    setDeleteTarget(null);
+    toast.success("Bill deleted");
+  };
 
   useEffect(() => {
     (async () => {
