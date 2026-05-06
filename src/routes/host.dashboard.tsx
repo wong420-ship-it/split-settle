@@ -633,6 +633,47 @@ function HostDashboard() {
           </div>
         </section>
 
+        {hostGuestId && (
+          <section
+            className={`flex flex-col gap-3 rounded-2xl p-5 ${
+              hostPaidAt
+                ? "bg-secondary text-secondary-foreground"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            <div>
+              <div className="text-xs uppercase tracking-wider opacity-80">
+                {hostPaidAt ? "You paid" : "Your share"}
+              </div>
+              <div className="font-mono text-4xl font-bold">${hostTotal.toFixed(2)}</div>
+              <div className="mt-1 text-xs opacity-80">
+                {hostItems.length === 0
+                  ? "Claim items above to add to your share"
+                  : `${hostItems.length} item${hostItems.length === 1 ? "" : "s"} · ${(hostShareRatio * 100).toFixed(0)}% of bill`}
+              </div>
+              {hostPaidAt && (
+                <div className="mt-1 text-xs opacity-80">
+                  Marked paid {new Date(hostPaidAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </div>
+              )}
+            </div>
+            <Button
+              variant={hostPaidAt ? "outline" : "secondary"}
+              size="lg"
+              className="h-11"
+              onClick={toggleHostPaid}
+            >
+              {hostPaidAt ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" /> Paid — tap to undo
+                </>
+              ) : (
+                "Mark as paid"
+              )}
+            </Button>
+          </section>
+        )}
+
         <section className="flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-accent p-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-accent-foreground">Share with your table</div>
           <div className="text-2xl font-bold tracking-[0.3em] text-foreground">{session.share_code}</div>
