@@ -516,8 +516,25 @@ function HostDashboard() {
   if (loading || !session) {
     return (
       <AppShell>
-        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
-          Loading your bill…
+        <div className="flex flex-col gap-6">
+          <div className="space-y-2">
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+            <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="mb-3 h-3 w-12 animate-pulse rounded bg-muted" />
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded bg-muted/60" />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-20 animate-pulse rounded-2xl bg-card" />
+            <div className="h-20 animate-pulse rounded-2xl bg-card" />
+          </div>
+          <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
         </div>
       </AppShell>
     );
