@@ -396,6 +396,7 @@ function HostDashboard() {
     else toast.success(`Removed ${g.display_name}`);
   };
 
+  const claimAllUnclaimed = async () => {
     if (!session || !hostGuestId) return;
     const unclaimed = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
     if (!unclaimed.length) return;
