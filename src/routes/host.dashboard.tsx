@@ -313,7 +313,91 @@ function HostDashboard() {
     }
   };
 
-  const handleReceiptSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const startEditItem = (item: Item) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+    setEditPrice(String(item.price));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditPrice("");
+  };
+
+  const saveEdit = async (itemId: string) => {
+    const name = editName.trim().slice(0, 120);
+    const price = parseFloat(editPrice);
+    if (!name) {
+      toast.error("Name is required.");
+      return;
+    }
+    if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) {
+      toast.error("Price must be between $0.01 and $100,000.");
+      return;
+    }
+    setSavingEdit(true);
+    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, name, price } : i)));
+    const { error } = await supabase
+      .from("bill_items")
+      .update({ name, price })
+      .eq("id", itemId);
+    setSavingEdit(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    cancelEdit();
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setClaims((prev) => prev.filter((c) => c.item_id !== id));
+    // Delete dependent claims first (no FK cascade in schema).
+    await supabase.from("item_claims").delete().eq("item_id", id);
+    const { error } = await supabase.from("bill_items").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else toast.success("Item removed");
+  };
+
+  const claimAllUnclaimed = async () => {
+    if (!session || !hostGuestId) return;
+    const unclaimed = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
+    if (!unclaimed.length) return;
+    const rows = unclaimed.map((i) => ({ item_id: i.id, user_id: hostGuestId }));
+    setClaims((prev) => [...prev, ...rows]);
+    const { error } = await supabase.from("item_claims").insert(rows);
+    if (error) toast.error(error.message);
+    else toast.success(`Claimed ${unclaimed.length} item${unclaimed.length === 1 ? "" : "s"}`);
+  };
+
+  const shareLink = async (link: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join my bill on Seat Solo",
+          text: `Join my bill on Seat Solo (code ${session?.share_code})`,
+          url: link,
+        });
+        return;
+      } catch (err) {
+        // User cancelled — fall through to clipboard fallback only on real errors.
+        if ((err as Error)?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn't share or copy.");
+    }
+  };
+
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
