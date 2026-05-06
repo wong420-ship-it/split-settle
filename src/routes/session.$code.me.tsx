@@ -10,6 +10,7 @@ import { toast } from "sonner";
 type Session = { id: string; restaurant_name: string; tax_amount: number; tip_percentage: number };
 type Item = { id: string; name: string; price: number };
 type Claim = { item_id: string; user_id: string };
+type Guest = { id: string; display_name: string; paid_at: string | null };
 
 export const Route = createFileRoute("/session/$code/me")({
   head: () => ({
