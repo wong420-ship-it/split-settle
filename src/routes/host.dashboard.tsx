@@ -193,7 +193,7 @@ function HostDashboard() {
       setSavingReview(false);
       return;
     }
-    const patch: Record<string, any> = {};
+    const patch: { tax_amount?: number; restaurant_name?: string } = {};
     if (reviewTax != null) patch.tax_amount = reviewTax;
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
       patch.restaurant_name = reviewRestaurant;
