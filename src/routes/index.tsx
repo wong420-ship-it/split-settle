@@ -95,8 +95,8 @@ function Index() {
     <AppShell>
       <div className="flex flex-col gap-10 pt-8">
         <header className="flex flex-col gap-3">
-          <div className="inline-flex w-fit items-center gap-2">
-            <img src={seatSoloLogo} alt="Seat Solo" className="h-14 w-auto" />
+          <div className="flex justify-end">
+            <img src={seatSoloLogo} alt="Seat Solo" className="h-20 w-auto" />
           </div>
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-foreground">
             Dine Together,
