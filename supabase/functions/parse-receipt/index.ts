@@ -1,4 +1,6 @@
 // Receipt OCR via Lovable AI Gateway (Gemini vision)
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -11,6 +13,21 @@ Deno.serve(async (req) => {
   try {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) return json({ error: "Receipt parsing is not configured." }, 500);
+
+    // --- Auth: require a logged-in user (host) ---
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return json({ error: "Server misconfigured." }, 500);
+    }
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
+    if (!token) return json({ error: "Unauthorized" }, 401);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
 
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
