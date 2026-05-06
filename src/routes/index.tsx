@@ -157,6 +157,14 @@ function Index() {
           <p className="text-xs text-muted-foreground">
             You'll sign in with Google so only you can edit your bill.
           </p>
+          {signedIn && (
+            <Link
+              to="/host/history"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View your bills →
+            </Link>
+          )}
         </section>
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
