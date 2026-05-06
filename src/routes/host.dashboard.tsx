@@ -1088,6 +1088,9 @@ function HostDashboard() {
                     {g.paid_at ? <Check className="h-3.5 w-3.5" /> : g.display_name[0]?.toUpperCase()}
                   </span>
                   <span>{g.display_name}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    ${(guestTotals.get(g.id) ?? 0).toFixed(2)}
+                  </span>
                   {g.paid_at && (
                     <span className="text-xs font-normal text-primary">paid</span>
                   )}
