@@ -84,11 +84,27 @@ function Index() {
     setLoading(null);
   };
 
-  const joinBill = (e: React.FormEvent) => {
+  const joinBill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim().length < 4) return;
+    const trimmed = code.trim().toUpperCase();
+    if (trimmed.length < 4) return;
     setLoading("join");
-    navigate({ to: "/join/$code", params: { code: code.toUpperCase() } });
+    const { data, error } = await supabase
+      .from("bill_sessions")
+      .select("share_code")
+      .eq("share_code", trimmed)
+      .maybeSingle();
+    if (error) {
+      toast.error("Couldn't check code. Try again.");
+      setLoading(null);
+      return;
+    }
+    if (!data) {
+      toast.error("Code not found");
+      setLoading(null);
+      return;
+    }
+    navigate({ to: "/join/$code", params: { code: trimmed } });
   };
 
   return (

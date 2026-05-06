@@ -39,7 +39,7 @@ function Join() {
       .eq("share_code", code.toUpperCase())
       .maybeSingle();
     if (se || !s) {
-      toast.error("Bill not found. Check the code.");
+      toast.error("Code not found");
       setLoading(false);
       return;
     }
