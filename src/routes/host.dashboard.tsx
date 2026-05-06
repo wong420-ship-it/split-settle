@@ -1134,6 +1134,16 @@ function HostDashboard() {
                   {g.paid_at && (
                     <span className="text-xs font-normal text-primary">paid</span>
                   )}
+                  {g.id !== hostGuestId && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveGuestTarget(g)}
+                      aria-label={`Remove ${g.display_name}`}
+                      className="-mr-1 ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
