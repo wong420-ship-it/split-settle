@@ -85,7 +85,7 @@ function HostDashboard() {
       setSession(s as Session);
       const [{ data: its }, { data: gs }] = await Promise.all([
         supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
-        supabase.from("session_users").select("id, display_name").eq("session_id", s.id),
+        supabase.from("session_users").select("id, display_name, paid_at").eq("session_id", s.id),
       ]);
       setItems((its ?? []) as Item[]);
       setGuests((gs ?? []) as Guest[]);
@@ -140,7 +140,7 @@ function HostDashboard() {
         () => {
           supabase
             .from("session_users")
-            .select("id, display_name")
+            .select("id, display_name, paid_at")
             .eq("session_id", session.id)
             .then(({ data }) => data && setGuests(data as Guest[]));
         },
