@@ -40,6 +40,7 @@ async function createSessionAndGo(navigate: ReturnType<typeof useNavigate>) {
 function Index() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"host" | "join" | null>(null);
 
   // If we land back here after OAuth with a session, auto-create a bill.
