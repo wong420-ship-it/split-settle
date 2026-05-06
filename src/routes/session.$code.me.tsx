@@ -229,7 +229,7 @@ function Me() {
             setMarking(false);
             if (error) {
               setPaidAt(prev);
-              toast.error("Couldn't update — try again.");
+              toast.error(`Couldn't update: ${error.message}`);
               return;
             }
             toast.success(next ? "Marked as paid" : "Marked unpaid");
