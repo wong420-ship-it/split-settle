@@ -10,6 +10,7 @@ import { toast } from "sonner";
 type Session = { id: string; restaurant_name: string; tax_amount: number; tip_percentage: number };
 type Item = { id: string; name: string; price: number };
 type Claim = { item_id: string; user_id: string };
+type Guest = { id: string; display_name: string; paid_at: string | null };
 
 export const Route = createFileRoute("/session/$code/me")({
   head: () => ({
@@ -27,6 +28,7 @@ function Me() {
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,12 +76,23 @@ function Me() {
       } else {
         setClaims([]);
       }
-      const { data: meRow } = await supabase
+      const { data: gs } = await supabase
         .from("session_users")
-        .select("paid_at")
-        .eq("id", meId)
-        .maybeSingle();
-      setPaidAt((meRow as { paid_at: string | null } | null)?.paid_at ?? null);
+        .select("id, display_name, paid_at")
+        .eq("session_id", session.id);
+      const guestList = (gs ?? []) as Guest[];
+      setGuests((prev) => {
+        for (const g of guestList) {
+          if (!g.paid_at || g.id === meId) continue;
+          const before = prev.find((p) => p.id === g.id);
+          if (before && !before.paid_at) {
+            toast.success(`${g.display_name} marked as paid`);
+          }
+        }
+        return guestList;
+      });
+      const me = guestList.find((g) => g.id === meId);
+      setPaidAt(me?.paid_at ?? null);
     };
     refetchAll();
     const channel = supabase
@@ -96,7 +109,7 @@ function Me() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "session_users", filter: `id=eq.${meId}` },
+        { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
         () => refetchAll(),
       )
       .subscribe((status) => {
@@ -243,6 +256,58 @@ function Me() {
             "Mark as paid"
           )}
         </Button>
+
+        {guests.length > 0 && (() => {
+          const paidCount = guests.filter((g) => g.paid_at).length;
+          const allPaid = paidCount === guests.length;
+          const pct = Math.round((paidCount / guests.length) * 100);
+          const unpaid = guests.filter((g) => !g.paid_at);
+          return (
+            <section
+              className={`rounded-2xl border p-4 ${
+                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+              }`}
+            >
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="text-foreground">
+                  {allPaid ? "Everyone has paid 🎉" : "Table payments"}
+                </span>
+                <span className="font-mono text-foreground">
+                  {paidCount} / {guests.length}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {guests.map((g) => (
+                  <li
+                    key={g.id}
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      g.paid_at
+                        ? "bg-primary/15 text-foreground"
+                        : "bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    {g.paid_at && <Check className="h-3 w-3 text-primary" />}
+                    <span>
+                      {g.display_name}
+                      {g.id === meId && " (you)"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {!allPaid && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Waiting on {unpaid.map((g) => (g.id === meId ? "you" : g.display_name)).join(", ")}
+                </p>
+              )}
+            </section>
+          );
+        })()}
         <Link to="/" className="text-center text-sm text-muted-foreground underline">
           Back to home
         </Link>
