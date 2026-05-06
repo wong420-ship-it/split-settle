@@ -289,6 +289,11 @@ function HostDashboard() {
       }
       setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
       setReviewTax(typeof json.tax === "number" ? json.tax : null);
+      setReviewFees(
+        Array.isArray(json.fees)
+          ? json.fees.map((f: any) => ({ name: String(f.name ?? "Fee"), amount: String(f.amount) }))
+          : [],
+      );
       setReviewRestaurant(json.restaurant || null);
       setReviewOpen(true);
       clearPending();
