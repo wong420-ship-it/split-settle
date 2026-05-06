@@ -92,7 +92,13 @@ function Me() {
         return guestList;
       });
       const me = guestList.find((g) => g.id === meId);
-      setPaidAt(me?.paid_at ?? null);
+      if (!me) {
+        // Host deleted this guest; reset local identity.
+        clearGuest(code);
+        navigate({ to: "/join/$code", params: { code } });
+        return;
+      }
+      setPaidAt(me.paid_at ?? null);
     };
     refetchAll();
     const channel = supabase
