@@ -218,7 +218,13 @@ function HostDashboard() {
               if (!data) return;
               const next = data as Guest[];
               setGuests((prev) => {
+                const prevIds = new Set(prev.map((p) => p.id));
                 for (const g of next) {
+                  // Skip the host's own row when announcing new joiners.
+                  const isHost = / \(host\)$/.test(g.display_name);
+                  if (!prevIds.has(g.id) && !isHost && prev.length > 0) {
+                    toast(`${g.display_name} joined`);
+                  }
                   if (!g.paid_at) continue;
                   const before = prev.find((p) => p.id === g.id);
                   if (before && !before.paid_at) {
