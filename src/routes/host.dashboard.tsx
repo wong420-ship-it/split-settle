@@ -525,6 +525,43 @@ function HostDashboard() {
           </button>
         </section>
 
+        {guests.length > 0 && (() => {
+          const paidCount = guests.filter((g) => g.paid_at).length;
+          const allPaid = paidCount === guests.length;
+          const pct = Math.round((paidCount / guests.length) * 100);
+          return (
+            <section
+              className={`rounded-2xl border p-4 ${
+                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+              }`}
+            >
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="text-foreground">
+                  {allPaid ? "Everyone has paid 🎉" : "Payments"}
+                </span>
+                <span className="font-mono text-foreground">
+                  {paidCount} / {guests.length}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              {!allPaid && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Waiting on{" "}
+                  {guests
+                    .filter((g) => !g.paid_at)
+                    .map((g) => g.display_name)
+                    .join(", ")}
+                </p>
+              )}
+            </section>
+          );
+        })()}
+
         <section className="rounded-2xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Users className="h-3.5 w-3.5" /> Joined ({guests.length})
