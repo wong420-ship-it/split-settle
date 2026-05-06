@@ -142,7 +142,21 @@ function HostDashboard() {
             .from("session_users")
             .select("id, display_name, paid_at")
             .eq("session_id", session.id)
-            .then(({ data }) => data && setGuests(data as Guest[]));
+            .then(({ data }) => {
+              if (!data) return;
+              const next = data as Guest[];
+              setGuests((prev) => {
+                // Detect newly-paid guests and toast the host.
+                for (const g of next) {
+                  if (!g.paid_at) continue;
+                  const before = prev.find((p) => p.id === g.id);
+                  if (before && !before.paid_at) {
+                    toast.success(`${g.display_name} marked as paid`);
+                  }
+                }
+                return next;
+              });
+            });
         },
       )
       .on(
@@ -510,6 +524,43 @@ function HostDashboard() {
             {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
           </button>
         </section>
+
+        {guests.length > 0 && (() => {
+          const paidCount = guests.filter((g) => g.paid_at).length;
+          const allPaid = paidCount === guests.length;
+          const pct = Math.round((paidCount / guests.length) * 100);
+          return (
+            <section
+              className={`rounded-2xl border p-4 ${
+                allPaid ? "border-primary bg-primary/10" : "border-border bg-card"
+              }`}
+            >
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="text-foreground">
+                  {allPaid ? "Everyone has paid 🎉" : "Payments"}
+                </span>
+                <span className="font-mono text-foreground">
+                  {paidCount} / {guests.length}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              {!allPaid && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Waiting on{" "}
+                  {guests
+                    .filter((g) => !g.paid_at)
+                    .map((g) => g.display_name)
+                    .join(", ")}
+                </p>
+              )}
+            </section>
+          );
+        })()}
 
         <section className="rounded-2xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
