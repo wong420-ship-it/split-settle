@@ -98,6 +98,16 @@ function HostDashboard() {
         return;
       }
       setSession(s as Session);
+      // Apply remembered tip preference if this is a fresh bill (still default 18).
+      if (typeof window !== "undefined" && Number(s.tip_percentage) === 18) {
+        const savedRaw = localStorage.getItem("seatsolo:lastTipPct");
+        const saved = savedRaw == null ? null : parseFloat(savedRaw);
+        if (saved !== null && Number.isFinite(saved) && saved !== 18 && saved >= 0 && saved <= MAX_TIP) {
+          await supabase.from("bill_sessions").update({ tip_percentage: saved }).eq("id", s.id);
+          (s as Session).tip_percentage = saved;
+          setSession({ ...(s as Session), tip_percentage: saved });
+        }
+      }
       const [{ data: its }, { data: gs }] = await Promise.all([
         supabase.from("bill_items").select("id, name, price").eq("session_id", s.id),
         supabase.from("session_users").select("id, display_name, paid_at").eq("session_id", s.id),
