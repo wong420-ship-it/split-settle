@@ -1,15 +1,18 @@
 ## Goal
 
-Remove the extra "Read items" tap. As soon as a host picks a photo (camera or file), kick off OCR automatically.
+Give the host clear visual feedback while the receipt OCR is running, so it doesn't feel frozen during the 5–45s wait.
 
 ## Changes (`src/routes/host.dashboard.tsx`)
 
-1. **`handleReceiptSelect`**: After setting `pendingFile`/`pendingPreview`, immediately call `processReceipt(file)` instead of waiting for a button tap.
-2. **`processReceipt`**: Accept the file as an argument (fallback to `pendingFile`) so it doesn't race with the just-set state.
-3. **Preview UI (lines ~595–631)**: While `ocrLoading`, show the preview thumbnail with a "Reading receipt…" status and a spinner. Replace the two-button row with a single "Cancel" (disabled while loading is mid-flight, or allow abort — keep simple: hide cancel during loading). Drop the "Read items" button entirely.
-4. **Error path**: If OCR fails or returns no items, keep `pendingPreview` cleared (already does) and surface the existing toast — user can re-pick. No retry button needed since re-tapping Camera/Upload restarts the flow.
+Update the `pendingPreview` block (around lines 597–613) so that while `ocrLoading` is true:
+
+1. **Spinner overlay on the thumbnail** — dim the receipt image (`brightness-75`) and center a `Loader2` (already imported) spinning in the middle.
+2. **Indeterminate progress bar** — under the "Reading receipt…" label, render a thin track (`h-1.5 w-full bg-border rounded-full`) with an inner bar that animates left↔right to convey continuous activity. Implemented as an inline keyframe so we don't touch global CSS unnecessarily — or add one small `@keyframes ocr-progress` block in `src/styles.css` if cleaner.
+3. **Status text refinement** — keep "Reading receipt…" but the progress bar carries the "something is happening" signal.
+
+No behavior changes; cancel button stays hidden during loading (already the case).
 
 ## Out of scope
 
-- Adding an abort/cancel mid-OCR (network call is ~5–45s; not worth the complexity now).
-- Changing the camera/upload entry buttons.
+- Real progress percentage (the edge function doesn't stream progress).
+- Time estimates or retry UI.
