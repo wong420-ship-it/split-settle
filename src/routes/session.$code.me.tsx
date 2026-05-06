@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getGuest } from "@/lib/guest";
+import { Check } from "lucide-react";
+import { toast } from "sonner";
 
 type Session = { id: string; restaurant_name: string; tax_amount: number; tip_percentage: number };
 type Item = { id: string; name: string; price: number };
