@@ -63,12 +63,14 @@ Deno.serve(async (req) => {
 Return JSON exactly in this shape:
 {
   "restaurant": string | null,
-  "items": [{ "name": string, "price": number }],
+  "items": [{ "name": string, "quantity": number, "unit_price": number }],
   "tax": number | null,
   "total": number | null
 }
 - Use the merchant/restaurant name from the top of the receipt.
-- Each item is a single ordered line item with its price (post-discount, pre-tax if shown that way). Skip subtotal/tax/tip/total lines.
+- Each item is one ordered line item. "quantity" is how many were ordered (e.g. "3 Chocolate Cake" => quantity 3). Default to 1 if not shown.
+- "unit_price" is the price for ONE of that item (post-discount, pre-tax if shown that way). If the receipt only shows a line total, divide by quantity.
+- Skip subtotal/tax/tip/total lines.
 - Prices must be numbers (no currency symbols).
 - If a value is unknown, use null.`,
                 },
