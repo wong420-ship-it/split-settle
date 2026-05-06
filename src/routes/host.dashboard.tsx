@@ -1037,13 +1037,24 @@ function HostDashboard() {
                 </p>
               )}
               {paidButUnclaimed && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-2">
                   <p className="text-xs text-destructive">
                     {unclaimedItems.map((i) => i.name).join(", ")} · ${unclaimedTotal.toFixed(2)} not covered
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Claim them yourself or assign to a guest before closing out.
                   </p>
+                  {hostGuestId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={claimAllUnclaimed}
+                    >
+                      Claim leftovers
+                    </Button>
+                  )}
                 </div>
               )}
             </section>
