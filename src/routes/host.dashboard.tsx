@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
@@ -23,6 +23,7 @@ type Session = {
 };
 type Item = { id: string; name: string; price: number };
 type Guest = { id: string; display_name: string };
+type Claim = { item_id: string; user_id: string };
 
 export const Route = createFileRoute("/host/dashboard")({
   validateSearch: (s: Record<string, unknown>) => ({ code: (s.code as string) || "" }),
@@ -41,6 +42,7 @@ function HostDashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [newName, setNewName] = useState("");
@@ -87,6 +89,14 @@ function HostDashboard() {
       ]);
       setItems((its ?? []) as Item[]);
       setGuests((gs ?? []) as Guest[]);
+      const itemIds = (its ?? []).map((i: any) => i.id);
+      if (itemIds.length) {
+        const { data: cs } = await supabase
+          .from("item_claims")
+          .select("item_id, user_id")
+          .in("item_id", itemIds);
+        setClaims((cs ?? []) as Claim[]);
+      }
       setLoading(false);
     })();
   }, [code, navigate]);
@@ -94,6 +104,22 @@ function HostDashboard() {
   // Realtime
   useEffect(() => {
     if (!session) return;
+    const refetchClaims = async () => {
+      const { data: its } = await supabase
+        .from("bill_items")
+        .select("id")
+        .eq("session_id", session.id);
+      const ids = (its ?? []).map((i: any) => i.id);
+      if (!ids.length) {
+        setClaims([]);
+        return;
+      }
+      const { data: cs } = await supabase
+        .from("item_claims")
+        .select("item_id, user_id")
+        .in("item_id", ids);
+      setClaims((cs ?? []) as Claim[]);
+    };
     const channel = supabase
       .channel(`host-${session.id}`)
       .on(
@@ -105,6 +131,7 @@ function HostDashboard() {
             .select("id, name, price")
             .eq("session_id", session.id)
             .then(({ data }) => data && setItems(data as Item[]));
+          refetchClaims();
         },
       )
       .on(
@@ -118,11 +145,28 @@ function HostDashboard() {
             .then(({ data }) => data && setGuests(data as Guest[]));
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "item_claims" },
+        () => refetchClaims(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [session]);
+
+  const claimsByItem = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of claims) {
+      const arr = m.get(c.item_id) ?? [];
+      arr.push(c.user_id);
+      m.set(c.item_id, arr);
+    }
+    return m;
+  }, [claims]);
+
+  const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
 
   const updateField = async (field: "tax_amount" | "tip_percentage", value: number) => {
     if (!session) return;
@@ -261,12 +305,36 @@ function HostDashboard() {
             </p>
           ) : (
             <ul className="divide-y divide-border">
-              {items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="text-foreground">{item.name}</span>
-                  <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
-                </li>
-              ))}
+              {items.map((item) => {
+                const claimers = claimsByItem.get(item.id) ?? [];
+                const splitN = claimers.length;
+                return (
+                  <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-foreground">{item.name}</span>
+                      {splitN === 0 ? (
+                        <span className="text-xs text-muted-foreground">Unclaimed</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-primary">
+                          {splitN > 1 ? <Users className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                          <span className="truncate">
+                            {claimers.map(guestName).join(", ")}
+                            {splitN > 1 && ` · split ${splitN} ways`}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end shrink-0">
+                      <span className="font-mono text-foreground">${Number(item.price).toFixed(2)}</span>
+                      {splitN > 1 && (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          ${(Number(item.price) / splitN).toFixed(2)} ea
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <form onSubmit={addItem} className="mt-3 flex gap-2 border-t border-border pt-3">
