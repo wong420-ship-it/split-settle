@@ -272,23 +272,45 @@ function HostDashboard() {
             </Button>
           </form>
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
             onChange={handleReceiptUpload}
           />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={ocrLoading}
-            className="mt-2 h-10 w-full"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {ocrLoading ? "Reading your receipt…" : "Upload receipt"}
-          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleReceiptUpload}
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={ocrLoading}
+              className="h-10"
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Take photo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={ocrLoading}
+              className="h-10"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload image
+            </Button>
+          </div>
+          {ocrLoading && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">Reading your receipt…</p>
+          )}
         </section>
 
         <section className="grid grid-cols-2 gap-3">
