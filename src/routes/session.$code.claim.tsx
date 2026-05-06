@@ -186,8 +186,15 @@ function Claim() {
   if (loading || !session) {
     return (
       <AppShell>
-        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
-          Loading…
+        <div className="flex flex-col gap-5">
+          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+          <ul className="flex flex-col gap-2.5">
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i} className="h-16 animate-pulse rounded-2xl bg-card" />
+            ))}
+          </ul>
         </div>
       </AppShell>
     );
