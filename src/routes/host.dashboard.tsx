@@ -509,6 +509,7 @@ function HostDashboard() {
     }
     setSavingReview(false);
     setReviewOpen(false);
+    setHasScannedReceipt(true);
     toast.success(`Added ${inserted.length} item${inserted.length === 1 ? "" : "s"}.`);
   };
 
