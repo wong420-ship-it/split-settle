@@ -91,6 +91,17 @@ function Claim() {
         .in("item_id", ids);
       setClaims((cs ?? []) as Claim[]);
     };
+    const refetchGuests = () =>
+      supabase
+        .from("session_users")
+        .select("id, display_name")
+        .eq("session_id", session.id)
+        .then(({ data }) => data && setGuests(data as Guest[]));
+    const refetchAll = () => {
+      refetchItems();
+      refetchClaims();
+      refetchGuests();
+    };
     const channel = supabase
       .channel(`claim-${session.id}`)
       .on(
@@ -109,17 +120,30 @@ function Claim() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
-        () => {
-          supabase
-            .from("session_users")
-            .select("id, display_name")
-            .eq("session_id", session.id)
-            .then(({ data }) => data && setGuests(data as Guest[]));
-        },
+        () => refetchGuests(),
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Once the realtime channel is live, fetch once more to close the
+        // race window between the initial load and the subscription becoming
+        // active. Without this, items inserted in that gap stay invisible
+        // until the user manually refreshes.
+        if (status === "SUBSCRIBED") refetchAll();
+      });
+    // Safety net: refetch when the tab regains focus or visibility, in case
+    // the realtime socket dropped while the screen was backgrounded.
+    const onFocus = () => refetchAll();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refetchAll();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    // Periodic poll as a final fallback (every 15s) — cheap and bounded.
+    const poll = window.setInterval(refetchAll, 15000);
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(poll);
     };
   }, [session]);
 
