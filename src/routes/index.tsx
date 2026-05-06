@@ -40,6 +40,7 @@ async function createSessionAndGo(navigate: ReturnType<typeof useNavigate>) {
 function Index() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"host" | "join" | null>(null);
 
   // If we land back here after OAuth with a session, auto-create a bill.
@@ -87,7 +88,15 @@ function Index() {
   const joinBill = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.length < 4) return;
+    setCodeError(null);
+    if (trimmed.length !== 6) {
+      setCodeError("Codes are 6 characters.");
+      return;
+    }
+    if (!/^[A-Z0-9]+$/.test(trimmed)) {
+      setCodeError("Letters and numbers only.");
+      return;
+    }
     setLoading("join");
     const { data, error } = await supabase
       .from("bill_sessions")
@@ -95,11 +104,13 @@ function Index() {
       .eq("share_code", trimmed)
       .maybeSingle();
     if (error) {
+      setCodeError("Couldn't check that code. Try again.");
       toast.error("Couldn't check code. Try again.");
       setLoading(null);
       return;
     }
     if (!data) {
+      setCodeError(`Code "${trimmed}" not found. Double-check with your host.`);
       toast.error("Code not found");
       setLoading(null);
       return;
@@ -141,20 +152,32 @@ function Index() {
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Got a code?</h2>
-          <form onSubmit={joinBill} className="flex flex-col gap-3">
+          <form onSubmit={joinBill} className="flex flex-col gap-2" noValidate>
             <Input
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setCode(e.target.value.toUpperCase());
+                if (codeError) setCodeError(null);
+              }}
               placeholder="6-character code"
               maxLength={6}
-              className="h-12 text-center text-lg font-mono tracking-[0.4em] uppercase"
+              aria-invalid={codeError ? true : undefined}
+              aria-describedby={codeError ? "join-code-error" : undefined}
+              className={`h-12 text-center text-lg font-mono tracking-[0.4em] uppercase ${
+                codeError ? "border-destructive focus-visible:ring-destructive" : ""
+              }`}
             />
+            {codeError && (
+              <p id="join-code-error" className="text-sm text-destructive">
+                {codeError}
+              </p>
+            )}
             <Button
               type="submit"
               variant="secondary"
               size="lg"
-              className="h-12 w-full text-base"
-              disabled={code.trim().length < 4 || loading !== null}
+              className="mt-1 h-12 w-full text-base"
+              disabled={code.trim().length === 0 || loading !== null}
             >
               {loading === "join" ? "Joining…" : "Join a Bill"}
             </Button>
