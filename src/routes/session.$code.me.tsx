@@ -76,12 +76,23 @@ function Me() {
       } else {
         setClaims([]);
       }
-      const { data: meRow } = await supabase
+      const { data: gs } = await supabase
         .from("session_users")
-        .select("paid_at")
-        .eq("id", meId)
-        .maybeSingle();
-      setPaidAt((meRow as { paid_at: string | null } | null)?.paid_at ?? null);
+        .select("id, display_name, paid_at")
+        .eq("session_id", session.id);
+      const guestList = (gs ?? []) as Guest[];
+      setGuests((prev) => {
+        for (const g of guestList) {
+          if (!g.paid_at || g.id === meId) continue;
+          const before = prev.find((p) => p.id === g.id);
+          if (before && !before.paid_at) {
+            toast.success(`${g.display_name} marked as paid`);
+          }
+        }
+        return guestList;
+      });
+      const me = guestList.find((g) => g.id === meId);
+      setPaidAt(me?.paid_at ?? null);
     };
     refetchAll();
     const channel = supabase
@@ -98,7 +109,7 @@ function Me() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "session_users", filter: `id=eq.${meId}` },
+        { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
         () => refetchAll(),
       )
       .subscribe((status) => {
