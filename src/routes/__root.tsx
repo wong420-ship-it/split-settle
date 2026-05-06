@@ -29,14 +29,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Seat Solo" },
+      { name: "description", content: "Split the bill" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Seat Solo" },
+      { property: "og:description", content: "Split the bill" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Seat Solo" },
+      { name: "twitter:description", content: "Split the bill" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7efce063-1bda-410c-9f8f-0b7e98b69973/id-preview-1a14d093--a1cd1a37-9c79-41cd-990d-f607a1265240.lovable.app-1778038864184.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7efce063-1bda-410c-9f8f-0b7e98b69973/id-preview-1a14d093--a1cd1a37-9c79-41cd-990d-f607a1265240.lovable.app-1778038864184.png" },
     ],
     links: [
       {
