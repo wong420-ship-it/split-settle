@@ -206,6 +206,8 @@ function HostDashboard() {
     setReviewOpen(false);
     toast.success(`Added ${rows.length} item${rows.length === 1 ? "" : "s"}.`);
   };
+
+  if (loading || !session) {
     return (
       <AppShell>
         <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
