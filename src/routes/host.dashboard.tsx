@@ -261,6 +261,9 @@ function HostDashboard() {
     if (!session) return;
     setSession({ ...session, [field]: value });
     const patch = field === "tax_amount" ? { tax_amount: value } : { tip_percentage: value };
+    if (field === "tip_percentage" && typeof window !== "undefined") {
+      localStorage.setItem("seatsolo:lastTipPct", String(value));
+    }
     await supabase.from("bill_sessions").update(patch).eq("id", session.id);
   };
 
