@@ -420,7 +420,15 @@ function HostDashboard() {
     <AppShell>
       <div className="flex flex-col gap-6 pb-12">
         <header>
-          <Link to="/" className="text-xs text-muted-foreground">← Back</Link>
+          <div className="flex items-center justify-between">
+            <Link to="/" className="text-xs text-muted-foreground">← Back</Link>
+            <Link
+              to="/host/history"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <History className="h-3.5 w-3.5" /> Your bills
+            </Link>
+          </div>
           <h1 className="mt-2 text-2xl font-bold">{session.restaurant_name}</h1>
           <p className="text-sm text-muted-foreground">
             {items.length} {items.length === 1 ? "item" : "items"}
