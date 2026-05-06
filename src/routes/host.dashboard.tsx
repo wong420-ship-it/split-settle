@@ -106,7 +106,18 @@ function HostDashboard() {
         "Host";
       const hostKey = `seatsolo:host-guest:${s.id}`;
       let hostId = typeof window !== "undefined" ? localStorage.getItem(hostKey) : null;
-      const existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
+      let existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
+      // Fallback: if localStorage was cleared or this is a different device,
+      // reuse any existing "(host)" guest on the session instead of inserting
+      // a duplicate. Old bills opened from history would otherwise add a new
+      // host row on every visit.
+      if (!existingHost) {
+        existingHost = guestList.find((g) => / \(host\)$/.test(g.display_name)) ?? null;
+        if (existingHost) {
+          hostId = existingHost.id;
+          if (typeof window !== "undefined") localStorage.setItem(hostKey, existingHost.id);
+        }
+      }
       if (!existingHost) {
         // StrictMode-safe: dedupe concurrent inserts via a ref-stored promise.
         if (!hostInsertRef.current) {
