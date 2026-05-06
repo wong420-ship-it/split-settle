@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { Camera, Check, Copy, History, Loader2, Pencil, Plus, Share2, Trash2, Upload, UserPlus, Users } from "lucide-react";
+import { Camera, Check, Copy, History, Loader2, Pencil, Plus, Share2, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -82,6 +82,7 @@ function HostDashboard() {
   const [editPrice, setEditPrice] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [removeGuestTarget, setRemoveGuestTarget] = useState<Guest | null>(null);
   const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
 
   // Load session + verify auth
@@ -371,6 +372,28 @@ function HostDashboard() {
     const { error } = await supabase.from("bill_items").delete().eq("id", id);
     if (error) toast.error(error.message);
     else toast.success("Item removed");
+  };
+
+  const confirmRemoveGuest = async () => {
+    const g = removeGuestTarget;
+    if (!g) return;
+    setRemoveGuestTarget(null);
+    setGuests((prev) => prev.filter((x) => x.id !== g.id));
+    setClaims((prev) => prev.filter((c) => c.user_id !== g.id));
+    const { error: claimsErr } = await supabase
+      .from("item_claims")
+      .delete()
+      .eq("user_id", g.id);
+    if (claimsErr) {
+      toast.error(claimsErr.message);
+      return;
+    }
+    const { error } = await supabase
+      .from("session_users")
+      .delete()
+      .eq("id", g.id);
+    if (error) toast.error(error.message);
+    else toast.success(`Removed ${g.display_name}`);
   };
 
   const claimAllUnclaimed = async () => {
@@ -1111,6 +1134,16 @@ function HostDashboard() {
                   {g.paid_at && (
                     <span className="text-xs font-normal text-primary">paid</span>
                   )}
+                  {g.id !== hostGuestId && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveGuestTarget(g)}
+                      aria-label={`Remove ${g.display_name}`}
+                      className="-mr-1 ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1261,6 +1294,21 @@ function HostDashboard() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteItem}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!removeGuestTarget} onOpenChange={(open) => !open && setRemoveGuestTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {removeGuestTarget?.display_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They'll be removed from the bill and any items they claimed will become unclaimed. They can rejoin with the share code.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveGuest}>Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
