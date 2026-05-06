@@ -374,7 +374,28 @@ function HostDashboard() {
     else toast.success("Item removed");
   };
 
-  const claimAllUnclaimed = async () => {
+  const confirmRemoveGuest = async () => {
+    const g = removeGuestTarget;
+    if (!g) return;
+    setRemoveGuestTarget(null);
+    setGuests((prev) => prev.filter((x) => x.id !== g.id));
+    setClaims((prev) => prev.filter((c) => c.user_id !== g.id));
+    const { error: claimsErr } = await supabase
+      .from("item_claims")
+      .delete()
+      .eq("user_id", g.id);
+    if (claimsErr) {
+      toast.error(claimsErr.message);
+      return;
+    }
+    const { error } = await supabase
+      .from("session_users")
+      .delete()
+      .eq("id", g.id);
+    if (error) toast.error(error.message);
+    else toast.success(`Removed ${g.display_name}`);
+  };
+
     if (!session || !hostGuestId) return;
     const unclaimed = items.filter((i) => (claimsByItem.get(i.id) ?? []).length === 0);
     if (!unclaimed.length) return;
