@@ -52,6 +52,8 @@ function HostDashboard() {
   const [reviewTax, setReviewTax] = useState<number | null>(null);
   const [reviewRestaurant, setReviewRestaurant] = useState<string | null>(null);
   const [savingReview, setSavingReview] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -142,14 +144,27 @@ function HostDashboard() {
     setAdding(false);
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !session) return;
+    if (!file) return;
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(file);
+    setPendingPreview(URL.createObjectURL(file));
+  };
+
+  const clearPending = () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(null);
+    setPendingPreview(null);
+  };
+
+  const processReceipt = async () => {
+    if (!pendingFile || !session) return;
     setOcrLoading(true);
     try {
       const fd = new FormData();
-      fd.append("document", file);
+      fd.append("document", pendingFile);
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
       const resp = await fetch(url, {
         method: "POST",
@@ -163,12 +178,14 @@ function HostDashboard() {
       }
       if (!json.items || json.items.length === 0) {
         toast.error("Couldn't read items from this receipt — please add them manually.");
+        clearPending();
         return;
       }
       setReviewItems(json.items.map((i: any) => ({ name: i.name, price: String(i.price) })));
       setReviewTax(typeof json.tax === "number" ? json.tax : null);
       setReviewRestaurant(json.restaurant || null);
       setReviewOpen(true);
+      clearPending();
     } catch (err) {
       toast.error("Receipt upload failed.");
     } finally {
@@ -277,39 +294,75 @@ function HostDashboard() {
             accept="image/*"
             capture="environment"
             className="hidden"
-            onChange={handleReceiptUpload}
+            onChange={handleReceiptSelect}
           />
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handleReceiptUpload}
+            onChange={handleReceiptSelect}
           />
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={ocrLoading}
-              className="h-10"
-            >
-              <Camera className="mr-2 h-4 w-4" />
-              Take photo
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={ocrLoading}
-              className="h-10"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload image
-            </Button>
-          </div>
-          {ocrLoading && (
-            <p className="mt-2 text-center text-xs text-muted-foreground">Reading your receipt…</p>
+          {pendingPreview ? (
+            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-secondary/40 p-3">
+              <div className="flex gap-3">
+                <img
+                  src={pendingPreview}
+                  alt="Receipt preview"
+                  className="h-24 w-24 shrink-0 rounded-md border border-border object-cover"
+                />
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {pendingFile?.name || "Receipt"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Ready to scan. Review the image, then read items.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={clearPending}
+                  disabled={ocrLoading}
+                  className="h-10 flex-1"
+                >
+                  Remove
+                </Button>
+                <Button
+                  type="button"
+                  onClick={processReceipt}
+                  disabled={ocrLoading}
+                  className="h-10 flex-1"
+                >
+                  {ocrLoading ? "Reading…" : "Read items"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={ocrLoading}
+                className="h-10"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Take photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={ocrLoading}
+                className="h-10"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload image
+              </Button>
+            </div>
           )}
         </section>
 
