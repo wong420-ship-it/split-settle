@@ -142,7 +142,21 @@ function HostDashboard() {
             .from("session_users")
             .select("id, display_name, paid_at")
             .eq("session_id", session.id)
-            .then(({ data }) => data && setGuests(data as Guest[]));
+            .then(({ data }) => {
+              if (!data) return;
+              const next = data as Guest[];
+              setGuests((prev) => {
+                // Detect newly-paid guests and toast the host.
+                for (const g of next) {
+                  if (!g.paid_at) continue;
+                  const before = prev.find((p) => p.id === g.id);
+                  if (before && !before.paid_at) {
+                    toast.success(`${g.display_name} marked as paid`);
+                  }
+                }
+                return next;
+              });
+            });
         },
       )
       .on(
