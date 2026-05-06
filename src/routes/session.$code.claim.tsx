@@ -1,11 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
-import { mockBill, type Item } from "@/lib/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { getGuest } from "@/lib/guest";
 import { Check } from "lucide-react";
 
-const ME = "You";
+type Session = { id: string; restaurant_name: string };
+type Item = { id: string; name: string; price: number; claimed_by_user_id: string | null };
+type Guest = { id: string; display_name: string };
 
 export const Route = createFileRoute("/session/$code/claim")({
   head: () => ({
@@ -19,26 +22,106 @@ export const Route = createFileRoute("/session/$code/claim")({
 
 function Claim() {
   const { code } = Route.useParams();
-  const [items, setItems] = useState<Item[]>(mockBill.items);
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [meId, setMeId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const toggle = (id: string) => {
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? { ...i, claimedBy: i.claimedBy === ME ? null : i.claimedBy ? i.claimedBy : ME }
-          : i,
-      ),
-    );
+  useEffect(() => {
+    const guest = getGuest(code);
+    if (!guest) {
+      navigate({ to: "/join/$code", params: { code } });
+      return;
+    }
+    setMeId(guest.id);
+    (async () => {
+      const { data: s } = await supabase
+        .from("bill_sessions")
+        .select("id, restaurant_name")
+        .eq("share_code", code.toUpperCase())
+        .maybeSingle();
+      if (!s) {
+        navigate({ to: "/" });
+        return;
+      }
+      setSession(s as Session);
+      const [{ data: its }, { data: gs }] = await Promise.all([
+        supabase.from("bill_items").select("id, name, price, claimed_by_user_id").eq("session_id", s.id),
+        supabase.from("session_users").select("id, display_name").eq("session_id", s.id),
+      ]);
+      setItems((its ?? []) as Item[]);
+      setGuests((gs ?? []) as Guest[]);
+      setLoading(false);
+    })();
+  }, [code, navigate]);
+
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`claim-${session.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bill_items", filter: `session_id=eq.${session.id}` },
+        () => {
+          supabase
+            .from("bill_items")
+            .select("id, name, price, claimed_by_user_id")
+            .eq("session_id", session.id)
+            .then(({ data }) => data && setItems(data as Item[]));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "session_users", filter: `session_id=eq.${session.id}` },
+        () => {
+          supabase
+            .from("session_users")
+            .select("id, display_name")
+            .eq("session_id", session.id)
+            .then(({ data }) => data && setGuests(data as Guest[]));
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
+  const toggle = async (item: Item) => {
+    if (!meId) return;
+    const mine = item.claimed_by_user_id === meId;
+    if (item.claimed_by_user_id && !mine) return;
+    const next = mine
+      ? { claimed_by_user_id: null, claimed_at: null }
+      : { claimed_by_user_id: meId, claimed_at: new Date().toISOString() };
+    setItems((p) => p.map((i) => (i.id === item.id ? { ...i, ...next } : i)));
+    await supabase.from("bill_items").update(next).eq("id", item.id);
   };
 
-  const myTotal = items.filter((i) => i.claimedBy === ME).reduce((s, i) => s + i.price, 0);
+  const guestName = (id: string) => guests.find((g) => g.id === id)?.display_name ?? "Someone";
+
+  if (loading || !session) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+          Loading…
+        </div>
+      </AppShell>
+    );
+  }
+
+  const myTotal = items
+    .filter((i) => i.claimed_by_user_id === meId)
+    .reduce((s, i) => s + Number(i.price), 0);
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5 pb-24">
         <header>
-          <Link to="/host/dashboard" className="text-xs text-muted-foreground">← Back to host view</Link>
-          <h1 className="mt-2 text-2xl font-bold">{mockBill.restaurant}</h1>
+          <Link to="/" className="text-xs text-muted-foreground">← Home</Link>
+          <h1 className="mt-2 text-2xl font-bold">{session.restaurant_name}</h1>
           <p className="text-sm text-muted-foreground">Tap the items you ordered.</p>
         </header>
 
@@ -49,12 +132,12 @@ function Claim() {
         ) : (
           <ul className="flex flex-col gap-2.5">
             {items.map((item) => {
-              const mine = item.claimedBy === ME;
-              const taken = !!item.claimedBy && !mine;
+              const mine = item.claimed_by_user_id === meId;
+              const taken = !!item.claimed_by_user_id && !mine;
               return (
                 <li key={item.id}>
                   <button
-                    onClick={() => toggle(item.id)}
+                    onClick={() => toggle(item)}
                     disabled={taken}
                     className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition-all ${
                       mine
@@ -72,13 +155,15 @@ function Claim() {
                             <Check className="h-3 w-3" /> Claimed by you
                           </span>
                         ) : taken ? (
-                          `Claimed by ${item.claimedBy}`
+                          `Claimed by ${guestName(item.claimed_by_user_id!)}`
                         ) : (
                           "Tap to claim"
                         )}
                       </span>
                     </div>
-                    <span className="font-mono font-semibold text-foreground">${item.price.toFixed(2)}</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      ${Number(item.price).toFixed(2)}
+                    </span>
                   </button>
                 </li>
               );

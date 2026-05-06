@@ -1,8 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
+import { supabase } from "@/integrations/supabase/client";
+import { getGuest, setGuest } from "@/lib/guest";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/join/$code")({
   head: () => ({
@@ -20,11 +23,38 @@ function Join() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  // If already joined, skip ahead
+  useEffect(() => {
+    const existing = getGuest(code);
+    if (existing) navigate({ to: "/session/$code/claim", params: { code } });
+  }, [code, navigate]);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setLoading(true);
-    setTimeout(() => navigate({ to: "/session/$code/claim", params: { code } }), 500);
+    const { data: s, error: se } = await supabase
+      .from("bill_sessions")
+      .select("id")
+      .eq("share_code", code.toUpperCase())
+      .maybeSingle();
+    if (se || !s) {
+      toast.error("Bill not found. Check the code.");
+      setLoading(false);
+      return;
+    }
+    const { data: u, error } = await supabase
+      .from("session_users")
+      .insert({ session_id: s.id, display_name: name.trim() })
+      .select("id, display_name")
+      .single();
+    if (error || !u) {
+      toast.error(error?.message ?? "Could not join");
+      setLoading(false);
+      return;
+    }
+    setGuest(code, { id: u.id, name: u.display_name });
+    navigate({ to: "/session/$code/claim", params: { code } });
   };
 
   return (

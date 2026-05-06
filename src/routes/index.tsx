@@ -1,8 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,24 +21,73 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+async function createSessionAndGo(navigate: ReturnType<typeof useNavigate>) {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return;
+  const { data, error } = await supabase
+    .from("bill_sessions")
+    .insert({ host_id: userData.user.id, restaurant_name: "My Bill" })
+    .select("share_code")
+    .single();
+  if (error || !data) {
+    toast.error(error?.message ?? "Could not create bill");
+    return;
+  }
+  navigate({ to: "/host/dashboard", search: { code: data.share_code } });
+}
+
 function Index() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState<"host" | "join" | null>(null);
 
-  const startBill = () => {
+  // If we land back here after OAuth with a session, auto-create a bill.
+  useEffect(() => {
+    const pending = typeof window !== "undefined" && sessionStorage.getItem("seatsolo:pendingHost");
+    if (!pending) return;
+    sessionStorage.removeItem("seatsolo:pendingHost");
     setLoading("host");
-    setTimeout(() => navigate({ to: "/host/dashboard" }), 400);
+    (async () => {
+      // Wait briefly for session to hydrate
+      for (let i = 0; i < 20; i++) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      await createSessionAndGo(navigate);
+      setLoading(null);
+    })();
+  }, [navigate]);
+
+  const startBill = async () => {
+    setLoading("host");
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      await createSessionAndGo(navigate);
+      setLoading(null);
+      return;
+    }
+    sessionStorage.setItem("seatsolo:pendingHost", "1");
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (result.error) {
+      sessionStorage.removeItem("seatsolo:pendingHost");
+      toast.error("Sign-in failed. Please try again.");
+      setLoading(null);
+      return;
+    }
+    if (result.redirected) return;
+    // Tokens returned inline
+    await createSessionAndGo(navigate);
+    setLoading(null);
   };
 
   const joinBill = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim().length < 4) return;
     setLoading("join");
-    setTimeout(
-      () => navigate({ to: "/join/$code", params: { code: code.toUpperCase() } }),
-      400,
-    );
+    navigate({ to: "/join/$code", params: { code: code.toUpperCase() } });
   };
 
   return (
@@ -57,9 +109,17 @@ function Index() {
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Hosting dinner?</h2>
-          <Button size="lg" className="h-12 w-full text-base" onClick={startBill} disabled={loading !== null}>
+          <Button
+            size="lg"
+            className="h-12 w-full text-base"
+            onClick={startBill}
+            disabled={loading !== null}
+          >
             {loading === "host" ? "Starting…" : "Start a New Bill"}
           </Button>
+          <p className="text-xs text-muted-foreground">
+            You'll sign in with Google so only you can edit your bill.
+          </p>
         </section>
 
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -82,9 +142,6 @@ function Index() {
               {loading === "join" ? "Joining…" : "Join a Bill"}
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground">
-            Try <button type="button" className="underline" onClick={() => setCode("TONY42")}>TONY42</button> for a demo.
-          </p>
         </section>
       </div>
     </AppShell>
