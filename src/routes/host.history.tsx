@@ -210,12 +210,13 @@ function HostHistory() {
                 blockers.push(`${unpaidCount} unpaid`);
               if (unclaimedCount > 0)
                 blockers.push(`${unclaimedCount} unclaimed`);
+              const summary = { session: s, total, guestCount, unpaidCount, unclaimedCount, status };
               return (
-                <li key={s.id}>
+                <li key={s.id} className="relative">
                   <Link
                     to="/host/dashboard"
                     search={{ code: s.share_code }}
-                    className="block rounded-2xl border border-border bg-card p-4 transition hover:border-primary/50"
+                    className="block rounded-2xl border border-border bg-card p-4 pr-12 transition hover:border-primary/50"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -240,6 +241,31 @@ function HostHistory() {
                       </span>
                     </div>
                   </Link>
+                  <div className="absolute right-2 top-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Bill options"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setDeleteTarget(summary);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete bill
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </li>
               );
             })}
