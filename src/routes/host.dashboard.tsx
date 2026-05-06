@@ -1,5 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+const MAX_PRICE = 100000;
+const MAX_TIP = 100;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
@@ -62,6 +65,8 @@ function HostDashboard() {
   const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const hostInsertRef = useRef<Promise<Guest | null> | null>(null);
+  const [tipInput, setTipInput] = useState<string>("");
 
   // Load session + verify auth
   useEffect(() => {
@@ -103,15 +108,26 @@ function HostDashboard() {
       let hostId = typeof window !== "undefined" ? localStorage.getItem(hostKey) : null;
       const existingHost = hostId ? guestList.find((g) => g.id === hostId) : null;
       if (!existingHost) {
-        const { data: inserted } = await supabase
-          .from("session_users")
-          .insert({ session_id: s.id, display_name: `${hostName} (host)` })
-          .select("id, display_name, paid_at")
-          .maybeSingle();
+        // StrictMode-safe: dedupe concurrent inserts via a ref-stored promise.
+        if (!hostInsertRef.current) {
+          hostInsertRef.current = (async () => {
+            const { data: inserted } = await supabase
+              .from("session_users")
+              .insert({ session_id: s.id, display_name: `${hostName} (host)` })
+              .select("id, display_name, paid_at")
+              .maybeSingle();
+            if (inserted && typeof window !== "undefined") {
+              localStorage.setItem(hostKey, inserted.id);
+            }
+            return inserted as Guest | null;
+          })();
+        }
+        const inserted = await hostInsertRef.current;
         if (inserted) {
           hostId = inserted.id;
-          if (typeof window !== "undefined") localStorage.setItem(hostKey, inserted.id);
-          guestList = [...guestList, inserted as Guest];
+          if (!guestList.find((g) => g.id === inserted.id)) {
+            guestList = [...guestList, inserted];
+          }
         }
       }
       setHostGuestId(hostId);
@@ -147,8 +163,10 @@ function HostDashboard() {
         .in("item_id", ids);
       setClaims((cs ?? []) as Claim[]);
     };
-    const channel = supabase
-      .channel(`host-${session.id}`)
+    // Subscribe per-item to keep claim updates scoped to this session.
+    const itemIds = items.map((i) => i.id);
+    const channel = supabase.channel(`host-${session.id}`);
+    channel
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bill_items", filter: `session_id=eq.${session.id}` },
@@ -173,7 +191,6 @@ function HostDashboard() {
               if (!data) return;
               const next = data as Guest[];
               setGuests((prev) => {
-                // Detect newly-paid guests and toast the host.
                 for (const g of next) {
                   if (!g.paid_at) continue;
                   const before = prev.find((p) => p.id === g.id);
@@ -185,17 +202,19 @@ function HostDashboard() {
               });
             });
         },
-      )
-      .on(
+      );
+    for (const id of itemIds) {
+      channel.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "item_claims" },
+        { event: "*", schema: "public", table: "item_claims", filter: `item_id=eq.${id}` },
         () => refetchClaims(),
-      )
-      .subscribe();
+      );
+    }
+    channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session]);
+  }, [session, items]);
 
   const claimsByItem = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -221,10 +240,16 @@ function HostDashboard() {
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session || !newName.trim() || !newPrice) return;
+    const price = parseFloat(newPrice);
+    if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) {
+      toast.error("Price must be between $0.01 and $100,000.");
+      return;
+    }
+    const name = newName.trim().slice(0, 120);
     setAdding(true);
     const { error } = await supabase
       .from("bill_items")
-      .insert({ session_id: session.id, name: newName.trim(), price: parseFloat(newPrice) });
+      .insert({ session_id: session.id, name, price });
     if (error) toast.error(error.message);
     setNewName("");
     setNewPrice("");
@@ -347,8 +372,10 @@ function HostDashboard() {
       return Number.isFinite(n) && n > 0 ? s + n : s;
     }, 0);
     const patch: { tax_amount?: number; restaurant_name?: string } = {};
-    if (reviewTax != null || feesTotal > 0) {
-      patch.tax_amount = (reviewTax ?? 0) + feesTotal;
+    const addTax = (reviewTax ?? 0) + feesTotal;
+    if (addTax > 0) {
+      // Append to existing tax instead of overwriting (e.g. multiple receipts).
+      patch.tax_amount = Number(session.tax_amount ?? 0) + addTax;
     }
     if (reviewRestaurant && (!session.restaurant_name || session.restaurant_name === "My Bill")) {
       patch.restaurant_name = reviewRestaurant;
@@ -631,8 +658,23 @@ function HostDashboard() {
             <div className="mt-2 flex items-center gap-1">
               <Input
                 type="number"
-                value={tip}
-                onChange={(e) => updateField("tip_percentage", parseFloat(e.target.value) || 0)}
+                inputMode="decimal"
+                min={0}
+                max={MAX_TIP}
+                value={tipInput === "" ? (Number.isFinite(tip) ? String(tip) : "") : tipInput}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setTipInput(raw);
+                  if (raw === "") {
+                    updateField("tip_percentage", 0);
+                    return;
+                  }
+                  const n = parseFloat(raw);
+                  if (Number.isFinite(n) && n >= 0 && n <= MAX_TIP) {
+                    updateField("tip_percentage", n);
+                  }
+                }}
+                onBlur={() => setTipInput("")}
                 className="h-8 border-0 p-0 text-lg font-semibold focus-visible:ring-0"
               />
               <span className="text-muted-foreground">%</span>

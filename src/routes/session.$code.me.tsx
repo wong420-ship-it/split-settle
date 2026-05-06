@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { getGuest } from "@/lib/guest";
+import { clearGuest, getGuest } from "@/lib/guest";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -92,7 +92,13 @@ function Me() {
         return guestList;
       });
       const me = guestList.find((g) => g.id === meId);
-      setPaidAt(me?.paid_at ?? null);
+      if (!me) {
+        // Host deleted this guest; reset local identity.
+        clearGuest(code);
+        navigate({ to: "/join/$code", params: { code } });
+        return;
+      }
+      setPaidAt(me.paid_at ?? null);
     };
     refetchAll();
     const channel = supabase
