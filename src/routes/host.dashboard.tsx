@@ -520,11 +520,27 @@ function HostDashboard() {
           ) : (
             <ul className="flex flex-wrap gap-2">
               {guests.map((g) => (
-                <li key={g.id} className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm font-medium">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                    {g.display_name[0]?.toUpperCase()}
+                <li
+                  key={g.id}
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
+                    g.paid_at
+                      ? "bg-primary/15 text-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                      g.paid_at
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {g.paid_at ? <Check className="h-3.5 w-3.5" /> : g.display_name[0]?.toUpperCase()}
                   </span>
-                  {g.display_name}
+                  <span>{g.display_name}</span>
+                  {g.paid_at && (
+                    <span className="text-xs font-normal text-primary">paid</span>
+                  )}
                 </li>
               ))}
             </ul>
