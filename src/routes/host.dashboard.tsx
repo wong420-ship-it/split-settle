@@ -46,6 +46,48 @@ type Item = { id: string; name: string; price: number };
 type Guest = { id: string; display_name: string; paid_at: string | null };
 type Claim = { item_id: string; user_id: string };
 
+// Conservative client-side compression: only kicks in for big JPEG/PNG/WebP photos.
+// Falls back to the original file on any failure or if the result isn't smaller.
+async function maybeCompressImage(file: File): Promise<{ file: File; compressed: boolean }> {
+  try {
+    const SIZE_THRESHOLD = 1.5 * 1024 * 1024; // 1.5 MB
+    const MAX_EDGE = 2000;
+    const QUALITY = 0.92;
+    const compressibleTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (file.size < SIZE_THRESHOLD) return { file, compressed: false };
+    if (!compressibleTypes.includes(file.type.toLowerCase())) return { file, compressed: false };
+
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    if (!bitmap) return { file, compressed: false };
+    const longEdge = Math.max(bitmap.width, bitmap.height);
+    if (longEdge <= MAX_EDGE) {
+      bitmap.close?.();
+      return { file, compressed: false };
+    }
+    const scale = MAX_EDGE / longEdge;
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close?.();
+      return { file, compressed: false };
+    }
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", QUALITY),
+    );
+    if (!blob || blob.size >= file.size) return { file, compressed: false };
+    const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return { file: new File([blob], newName, { type: "image/jpeg" }), compressed: true };
+  } catch {
+    return { file, compressed: false };
+  }
+}
+
 export const Route = createFileRoute("/host/dashboard")({
   validateSearch: (s: Record<string, unknown>) => ({ code: (s.code as string) || "" }),
   head: () => ({
