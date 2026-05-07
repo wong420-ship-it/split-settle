@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     const dataUrl = `data:${mime};base64,${b64}`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     let resp: Response;
     try {
