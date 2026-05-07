@@ -567,7 +567,7 @@ function HostDashboard() {
       const attempt = async (): Promise<Response> => {
         const ctrl = new AbortController();
         ocrAbortRef.current = ctrl;
-        const timer = setTimeout(() => ctrl.abort(), 35000);
+        const timer = setTimeout(() => ctrl.abort(), 60000);
         try {
           return await fetch(url, {
             method: "POST",
