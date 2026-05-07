@@ -71,6 +71,10 @@ function HostDashboard() {
   const [newPrice, setNewPrice] = useState("");
   const [adding, setAdding] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrStage, setOcrStage] = useState<"idle" | "optimizing" | "uploading" | "reading" | "retrying">("idle");
+  const [ocrElapsed, setOcrElapsed] = useState(0);
+  const [ocrFailed, setOcrFailed] = useState(false);
+  const ocrAbortRef = useRef<AbortController | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
   const [reviewTax, setReviewTax] = useState<number | null>(null);
