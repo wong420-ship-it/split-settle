@@ -295,6 +295,15 @@ function HostHistory() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setRenameValue(s.restaurant_name || "");
+                            setRenameTarget(summary);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" /> Rename bill
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onSelect={(e) => {
                             e.preventDefault();
