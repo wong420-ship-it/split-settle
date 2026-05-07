@@ -79,6 +79,38 @@ function HostHistory() {
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Summary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Summary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const confirmRename = async () => {
+    if (!renameTarget) return;
+    const newName = renameValue.trim();
+    if (!newName) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    const id = renameTarget.session.id;
+    setRenaming(true);
+    const { error } = await supabase
+      .from("bill_sessions")
+      .update({ restaurant_name: newName })
+      .eq("id", id);
+    setRenaming(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setSummaries((prev) =>
+      prev.map((s) =>
+        s.session.id === id
+          ? { ...s, session: { ...s.session, restaurant_name: newName } }
+          : s,
+      ),
+    );
+    setRenameTarget(null);
+    toast.success("Bill renamed");
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
