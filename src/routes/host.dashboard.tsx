@@ -46,6 +46,48 @@ type Item = { id: string; name: string; price: number };
 type Guest = { id: string; display_name: string; paid_at: string | null };
 type Claim = { item_id: string; user_id: string };
 
+// Conservative client-side compression: only kicks in for big JPEG/PNG/WebP photos.
+// Falls back to the original file on any failure or if the result isn't smaller.
+async function maybeCompressImage(file: File): Promise<{ file: File; compressed: boolean }> {
+  try {
+    const SIZE_THRESHOLD = 1.5 * 1024 * 1024; // 1.5 MB
+    const MAX_EDGE = 2000;
+    const QUALITY = 0.92;
+    const compressibleTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (file.size < SIZE_THRESHOLD) return { file, compressed: false };
+    if (!compressibleTypes.includes(file.type.toLowerCase())) return { file, compressed: false };
+
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    if (!bitmap) return { file, compressed: false };
+    const longEdge = Math.max(bitmap.width, bitmap.height);
+    if (longEdge <= MAX_EDGE) {
+      bitmap.close?.();
+      return { file, compressed: false };
+    }
+    const scale = MAX_EDGE / longEdge;
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close?.();
+      return { file, compressed: false };
+    }
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", QUALITY),
+    );
+    if (!blob || blob.size >= file.size) return { file, compressed: false };
+    const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return { file: new File([blob], newName, { type: "image/jpeg" }), compressed: true };
+  } catch {
+    return { file, compressed: false };
+  }
+}
+
 export const Route = createFileRoute("/host/dashboard")({
   validateSearch: (s: Record<string, unknown>) => ({ code: (s.code as string) || "" }),
   head: () => ({
@@ -71,6 +113,10 @@ function HostDashboard() {
   const [newPrice, setNewPrice] = useState("");
   const [adding, setAdding] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrStage, setOcrStage] = useState<"idle" | "optimizing" | "uploading" | "reading" | "retrying">("idle");
+  const [ocrElapsed, setOcrElapsed] = useState(0);
+  const [ocrFailed, setOcrFailed] = useState(false);
+  const ocrAbortRef = useRef<AbortController | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<{ name: string; price: string }[]>([]);
   const [reviewTax, setReviewTax] = useState<number | null>(null);
@@ -92,6 +138,15 @@ function HostDashboard() {
   const [deleteBillOpen, setDeleteBillOpen] = useState(false);
   const [deletingBill, setDeletingBill] = useState(false);
   const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
+
+  // OCR elapsed-time ticker
+  useEffect(() => {
+    if (!ocrLoading) return;
+    const start = Date.now();
+    setOcrElapsed(0);
+    const id = setInterval(() => setOcrElapsed(Math.floor((Date.now() - start) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [ocrLoading]);
 
   // Load session + verify auth
   useEffect(() => {
@@ -475,28 +530,84 @@ function HostDashboard() {
     setPendingPreview(null);
   };
 
+  const cancelOcr = () => {
+    ocrAbortRef.current?.abort();
+    ocrAbortRef.current = null;
+    setOcrLoading(false);
+    setOcrStage("idle");
+    setOcrFailed(false);
+    clearPending();
+  };
+
   const processReceipt = async (fileArg?: File) => {
     const file = fileArg ?? pendingFile;
     if (!file || !session) return;
     setOcrLoading(true);
+    setOcrFailed(false);
+    setOcrElapsed(0);
     try {
-      const fd = new FormData();
-      fd.append("document", file);
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      // 1. Optimize image (conservative; falls back to original)
+      setOcrStage("optimizing");
+      const { file: uploadFile } = await maybeCompressImage(file);
+
+      // 2. Auth
       const { data: { session: authSession } } = await supabase.auth.getSession();
       if (!authSession?.access_token) {
         toast.error("Please sign in again to scan receipts.");
         setOcrLoading(false);
+        setOcrStage("idle");
         return;
       }
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authSession.access_token}` },
-        body: fd,
-      });
-      const json = await resp.json();
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      const fd = new FormData();
+      fd.append("document", uploadFile);
+
+      // 3. Fetch with timeout + 1 retry on hang/transient failure
+      const attempt = async (): Promise<Response> => {
+        const ctrl = new AbortController();
+        ocrAbortRef.current = ctrl;
+        const timer = setTimeout(() => ctrl.abort(), 35000);
+        try {
+          return await fetch(url, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${authSession.access_token}` },
+            body: fd,
+            signal: ctrl.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      setOcrStage("uploading");
+      let resp: Response;
+      try {
+        resp = await attempt();
+        setOcrStage("reading");
+      } catch (e) {
+        if ((e as Error).name === "AbortError" && !ocrAbortRef.current) {
+          // user cancelled
+          return;
+        }
+        setOcrStage("retrying");
+        await new Promise((r) => setTimeout(r, 1000));
+        resp = await attempt();
+        setOcrStage("reading");
+      }
+
+      // Retry once on 5xx as well
+      if (resp.status >= 500 && resp.status < 600) {
+        setOcrStage("retrying");
+        await new Promise((r) => setTimeout(r, 1000));
+        resp = await attempt();
+        setOcrStage("reading");
+      }
+
+      const json = await resp.json().catch(() => ({} as any));
       if (!resp.ok) {
         toast.error(json.error || "Couldn't read receipt.");
+        setOcrFailed(true);
         return;
       }
       if (!json.items || json.items.length === 0) {
@@ -515,9 +626,14 @@ function HostDashboard() {
       setReviewOpen(true);
       clearPending();
     } catch (err) {
-      toast.error("Receipt upload failed.");
+      if ((err as Error).name === "AbortError") return;
+      console.error("[parse-receipt] failed:", err);
+      toast.error("Receipt upload failed. Tap Try again.");
+      setOcrFailed(true);
     } finally {
+      ocrAbortRef.current = null;
       setOcrLoading(false);
+      setOcrStage("idle");
     }
   };
 
@@ -912,8 +1028,26 @@ function HostDashboard() {
                       {pendingFile?.name || "Receipt"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {ocrLoading ? "Reading receipt…" : "Processing…"}
+                      {ocrLoading
+                        ? `${
+                            ocrStage === "optimizing"
+                              ? "Optimizing image…"
+                              : ocrStage === "uploading"
+                                ? "Uploading…"
+                                : ocrStage === "retrying"
+                                  ? "Retrying…"
+                                  : "Reading receipt…"
+                          } ${ocrElapsed}s`
+                        : ocrFailed
+                          ? "Couldn't read this receipt."
+                          : "Ready"}
                     </p>
+                    {ocrLoading && ocrStage === "reading" && ocrElapsed >= 15 && ocrElapsed < 25 && (
+                      <p className="mt-1 text-xs text-muted-foreground">Taking longer than usual — still working…</p>
+                    )}
+                    {ocrLoading && ocrStage === "reading" && ocrElapsed >= 25 && (
+                      <p className="mt-1 text-xs text-muted-foreground">If this hangs we'll retry automatically.</p>
+                    )}
                   </div>
                   {ocrLoading && (
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
@@ -925,13 +1059,33 @@ function HostDashboard() {
                   )}
                 </div>
               </div>
-              {!ocrLoading && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={clearPending}
-                  className="h-10 w-full"
-                >
+              {ocrLoading ? (
+                <Button type="button" variant="ghost" onClick={cancelOcr} className="h-10 w-full">
+                  Cancel
+                </Button>
+              ) : ocrFailed ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setOcrFailed(false);
+                      clearPending();
+                    }}
+                    className="h-10"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void processReceipt(pendingFile ?? undefined)}
+                    className="h-10"
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="ghost" onClick={clearPending} className="h-10 w-full">
                   Cancel
                 </Button>
               )}
