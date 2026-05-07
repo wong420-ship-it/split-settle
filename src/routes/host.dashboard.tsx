@@ -1028,8 +1028,26 @@ function HostDashboard() {
                       {pendingFile?.name || "Receipt"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {ocrLoading ? "Reading receipt…" : "Processing…"}
+                      {ocrLoading
+                        ? `${
+                            ocrStage === "optimizing"
+                              ? "Optimizing image…"
+                              : ocrStage === "uploading"
+                                ? "Uploading…"
+                                : ocrStage === "retrying"
+                                  ? "Retrying…"
+                                  : "Reading receipt…"
+                          } ${ocrElapsed}s`
+                        : ocrFailed
+                          ? "Couldn't read this receipt."
+                          : "Ready"}
                     </p>
+                    {ocrLoading && ocrStage === "reading" && ocrElapsed >= 15 && ocrElapsed < 25 && (
+                      <p className="mt-1 text-xs text-muted-foreground">Taking longer than usual — still working…</p>
+                    )}
+                    {ocrLoading && ocrStage === "reading" && ocrElapsed >= 25 && (
+                      <p className="mt-1 text-xs text-muted-foreground">If this hangs we'll retry automatically.</p>
+                    )}
                   </div>
                   {ocrLoading && (
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
@@ -1041,13 +1059,33 @@ function HostDashboard() {
                   )}
                 </div>
               </div>
-              {!ocrLoading && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={clearPending}
-                  className="h-10 w-full"
-                >
+              {ocrLoading ? (
+                <Button type="button" variant="ghost" onClick={cancelOcr} className="h-10 w-full">
+                  Cancel
+                </Button>
+              ) : ocrFailed ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setOcrFailed(false);
+                      clearPending();
+                    }}
+                    className="h-10"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void processReceipt(pendingFile ?? undefined)}
+                    className="h-10"
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="ghost" onClick={clearPending} className="h-10 w-full">
                   Cancel
                 </Button>
               )}
