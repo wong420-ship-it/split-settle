@@ -139,6 +139,15 @@ function HostDashboard() {
   const [deletingBill, setDeletingBill] = useState(false);
   const [hasScannedReceipt, setHasScannedReceipt] = useState(false);
 
+  // OCR elapsed-time ticker
+  useEffect(() => {
+    if (!ocrLoading) return;
+    const start = Date.now();
+    setOcrElapsed(0);
+    const id = setInterval(() => setOcrElapsed(Math.floor((Date.now() - start) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [ocrLoading]);
+
   // Load session + verify auth
   useEffect(() => {
     (async () => {
