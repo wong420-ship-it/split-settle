@@ -4,7 +4,15 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MoreVertical, Trash2 } from "lucide-react";
+import { MoreVertical, Trash2, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +79,38 @@ function HostHistory() {
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Summary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Summary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const confirmRename = async () => {
+    if (!renameTarget) return;
+    const newName = renameValue.trim();
+    if (!newName) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    const id = renameTarget.session.id;
+    setRenaming(true);
+    const { error } = await supabase
+      .from("bill_sessions")
+      .update({ restaurant_name: newName })
+      .eq("id", id);
+    setRenaming(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setSummaries((prev) =>
+      prev.map((s) =>
+        s.session.id === id
+          ? { ...s, session: { ...s.session, restaurant_name: newName } }
+          : s,
+      ),
+    );
+    setRenameTarget(null);
+    toast.success("Bill renamed");
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -255,6 +295,15 @@ function HostHistory() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setRenameValue(s.restaurant_name || "");
+                            setRenameTarget(summary);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" /> Rename bill
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onSelect={(e) => {
                             e.preventDefault();
@@ -300,6 +349,35 @@ function HostHistory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameTarget} onOpenChange={(open) => !renaming && !open && setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename bill</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="Bill name"
+            maxLength={80}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void confirmRename();
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={renaming}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmRename()} disabled={renaming || !renameValue.trim()}>
+              {renaming ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
