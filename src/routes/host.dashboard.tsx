@@ -521,28 +521,84 @@ function HostDashboard() {
     setPendingPreview(null);
   };
 
+  const cancelOcr = () => {
+    ocrAbortRef.current?.abort();
+    ocrAbortRef.current = null;
+    setOcrLoading(false);
+    setOcrStage("idle");
+    setOcrFailed(false);
+    clearPending();
+  };
+
   const processReceipt = async (fileArg?: File) => {
     const file = fileArg ?? pendingFile;
     if (!file || !session) return;
     setOcrLoading(true);
+    setOcrFailed(false);
+    setOcrElapsed(0);
     try {
-      const fd = new FormData();
-      fd.append("document", file);
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      // 1. Optimize image (conservative; falls back to original)
+      setOcrStage("optimizing");
+      const { file: uploadFile } = await maybeCompressImage(file);
+
+      // 2. Auth
       const { data: { session: authSession } } = await supabase.auth.getSession();
       if (!authSession?.access_token) {
         toast.error("Please sign in again to scan receipts.");
         setOcrLoading(false);
+        setOcrStage("idle");
         return;
       }
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authSession.access_token}` },
-        body: fd,
-      });
-      const json = await resp.json();
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-receipt`;
+      const fd = new FormData();
+      fd.append("document", uploadFile);
+
+      // 3. Fetch with timeout + 1 retry on hang/transient failure
+      const attempt = async (): Promise<Response> => {
+        const ctrl = new AbortController();
+        ocrAbortRef.current = ctrl;
+        const timer = setTimeout(() => ctrl.abort(), 35000);
+        try {
+          return await fetch(url, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${authSession.access_token}` },
+            body: fd,
+            signal: ctrl.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      setOcrStage("uploading");
+      let resp: Response;
+      try {
+        resp = await attempt();
+        setOcrStage("reading");
+      } catch (e) {
+        if ((e as Error).name === "AbortError" && !ocrAbortRef.current) {
+          // user cancelled
+          return;
+        }
+        setOcrStage("retrying");
+        await new Promise((r) => setTimeout(r, 1000));
+        resp = await attempt();
+        setOcrStage("reading");
+      }
+
+      // Retry once on 5xx as well
+      if (resp.status >= 500 && resp.status < 600) {
+        setOcrStage("retrying");
+        await new Promise((r) => setTimeout(r, 1000));
+        resp = await attempt();
+        setOcrStage("reading");
+      }
+
+      const json = await resp.json().catch(() => ({} as any));
       if (!resp.ok) {
         toast.error(json.error || "Couldn't read receipt.");
+        setOcrFailed(true);
         return;
       }
       if (!json.items || json.items.length === 0) {
@@ -561,9 +617,14 @@ function HostDashboard() {
       setReviewOpen(true);
       clearPending();
     } catch (err) {
-      toast.error("Receipt upload failed.");
+      if ((err as Error).name === "AbortError") return;
+      console.error("[parse-receipt] failed:", err);
+      toast.error("Receipt upload failed. Tap Try again.");
+      setOcrFailed(true);
     } finally {
+      ocrAbortRef.current = null;
       setOcrLoading(false);
+      setOcrStage("idle");
     }
   };
 
